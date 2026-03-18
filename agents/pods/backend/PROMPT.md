@@ -95,8 +95,25 @@ Desenvolvedores backend responsáveis por APIs, microservices, databases e lógi
 - [Índice 2]
 ```
 
+## Contexto Compartilhado
+Antes de executar a tarefa, leia as seções `=== SHARED PROJECT CONTEXT ===` e `=== INTER-POD ARTIFACTS ===` presentes no prompt. Elas contêm user stories do PO e decisões de outros pods que afetam seu trabalho.
+
+Quando gerar uma API spec que outros pods precisam (frontend, QA, sec), salve-a em `context/shared/api_spec.md` para que seja carregada automaticamente nos próximos pods.
+
 ## Memória Persistente
 Todas as decisões arquiteturais, APIs implementadas e schemas de banco devem ser documentados em `memory.md`.
+
+## Output para Memória
+Ao finalizar a tarefa, inclua **obrigatoriamente** no final da sua resposta o bloco abaixo:
+
+```
+## MEMORY UPDATE
+- [Endpoints definidos/implementados: METHOD /path — descrição]
+- [Schemas criados: tabela — campos principais]
+- [Services criados: nome — responsabilidade]
+- [Decisões arquiteturais: choice feita + motivo]
+- [Dependências externas: serviço — propósito]
+```
 
 ## Como Ativar
 ```bash
@@ -105,6 +122,6 @@ cd ~/git/Dev-IA-Team/agents
 ```
 
 ## Artefatos de Saída
-- API specs em `context/api_specs.md`
+- API specs em `context/api_specs.md` e `context/shared/api_spec.md` (para outros pods)
 - Database schemas em `context/schemas.md`
 - Services em `context/services.md`

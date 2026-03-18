@@ -1,0 +1,13 @@
+name=Authentication System
+
+# Step 1: PO define o escopo e user stories
+step po "Define user stories para um sistema de autenticação completo: registro com email/senha, login, logout, recuperação de senha por email, e login social com Google. Use MoSCoW para priorizar. MVP = registro + login + recuperação. Defina critérios de aceite para cada story."
+
+# Step 2: Backend e Frontend em paralelo (independentes)
+parallel backend "Implemente a API de autenticação baseada nas user stories do PO: POST /api/v1/auth/register (email, senha, nome), POST /api/v1/auth/login (retorna JWT + refresh token), POST /api/v1/auth/logout (invalida token), POST /api/v1/auth/forgot-password (envia email), POST /api/v1/auth/reset-password (valida token, nova senha). Use bcrypt rounds=12. Defina schemas: users (id, email, password_hash, name, created_at), sessions (id, user_id, token_hash, expires_at). Salve spec em context/shared/api_spec.md" | frontend "Construa os componentes de UI de autenticação: LoginForm (email, senha, submit, loading, error), RegisterForm (nome, email, senha, confirmar senha, validação), ForgotPasswordForm (email, confirmação de envio), ResetPasswordForm (nova senha, confirmar, token da URL). React + Tailwind. Inclua todos os estados (default, loading, error, success). WCAG 2.1 AA obrigatório."
+
+# Step 3: QA e Security em paralelo (revisam outputs do step 2)
+parallel qa "Crie um plano de testes completo para o sistema de auth. Unit tests: hash de senha, geração de token, validação de email. Integration tests: todos os 5 endpoints com inputs válidos e inválidos. E2E: fluxo completo registro → login → logout e fluxo de recuperação de senha. Edge cases: email duplicado no registro, token expirado, senha errada 3x. Quality gate: 80% cobertura, 0 bugs críticos abertos." | sec "Review de segurança do sistema de auth: OWASP A07 (brute force — rate limiting no login/register), implementação JWT (algoritmo RS256 não 'none', expiração 1h, rotação de refresh token), bcrypt rounds >= 12, fluxo de reset de senha (entropia do token, expiração 15min, uso único), enumeração de usuários no /forgot-password (resposta idêntica para email existente/inexistente), CSRF no checkout."
+
+# Step 4: DevOps empacota e coloca em produção
+step devops "Configure CI/CD para o serviço de autenticação: Dockerfile multi-stage (node:alpine, usuário não-root, imagem < 100MB), GitHub Actions com stages: lint → unit tests → integration tests → security scan (trivy) → build image → deploy staging → gate manual → deploy prod. Quality gates: 80% cobertura, 0 CVEs críticos. Alert: > 10 logins falhados/minuto (possível brute force)."

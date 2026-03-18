@@ -1,0 +1,16 @@
+name=SaaS MVP (Auth + Billing + Dashboard)
+
+# Step 1: PO define produto completo
+step po "Defina roadmap e user stories para um SaaS com: autenticação (email/senha + Google OAuth), billing com Stripe (plano Free e Pro com trial 14 dias), gestão de time (convidar membros, papéis owner/admin/member), e dashboard de uso com métricas do produto. MVP deve estar pronto em 6 semanas. Use MoSCoW e story points. Identifique dependências entre features."
+
+# Step 2: Backend define toda a API e schemas
+step backend "Projete e especifique a API completa do SaaS: auth (register, login, OAuth Google PKCE), billing (criar subscription Stripe, upgrade/downgrade plano, portal de billing, webhooks), teams (criar time, convidar membro por email, aceitar convite, remover membro, mudar papel), usage (registrar evento, listar métricas do dashboard). Schemas: users, teams, team_members, subscriptions, usage_events. Salve em context/shared/api_spec.md. Defina middleware de autorização por plano (Free vs Pro)."
+
+# Step 3: Frontend e DevOps em paralelo (frontend precisa da API spec, DevOps é independente)
+parallel frontend "Construa o SaaS frontend baseado na API spec compartilhada: OnboardingFlow (register → create team → invite members → connect billing), DashboardLayout com sidebar (Overview, Team, Billing, Settings), UsageChart (métricas de uso com recharts), TeamPage (lista de membros com papel e status do convite, formulário de convite), BillingPage com plano atual, botão upgrade, portal Stripe, TrialBanner (dias restantes do trial), PlanGate (bloqueia features Pro para usuários Free com upsell)." | devops "Configure a infraestrutura base do SaaS: Docker Compose para desenvolvimento local, GitHub Actions CI/CD (test → build → staging), variáveis de ambiente por ambiente (dev/staging/prod), Terraform para RDS postgres + ElastiCache redis + ECS para containers. Defina SLOs: disponibilidade 99.9%, p95 latência < 300ms. Configure Sentry para error tracking e Datadog para APM."
+
+# Step 4: QA e Security em paralelo
+parallel qa "Plano de testes do SaaS: fluxo completo de onboarding (register → billing → invite), upgrade de plano e acesso imediato às features Pro, downgrade e bloqueio correto das features, expiração do trial e conversão, convite de membro (email enviado, aceite, expiração do convite), remoção de membro e revogação de acesso, webhooks Stripe (payment_succeeded, payment_failed, subscription_updated). Teste de carga: 1000 usuários simultâneos no dashboard." | sec "Review de segurança do SaaS: OAuth2 PKCE flow (state parameter, redirect URI validation), autorização multi-tenant (user A não pode acessar dados do team B), billing security (webhook signature, price tampering em upgrade), LGPD compliance (consent, data export, account deletion), secrets management (API keys nunca em logs), session management (invalidação em logout, max sessions por user), OWASP Top 10 completo."
+
+# Step 5: DevOps finaliza produção
+step devops "Finalize produção do SaaS: pipeline de deploy blue/green para zero-downtime, database migrations automáticas no deploy, monitoramento de billing (alert subscription_failed, alert churn rate > 5%), runbook de incidentes (payment outage, auth outage), backup automatizado do RDS (diário, retenção 30 dias), disaster recovery documentado. Configure alertas PagerDuty para severidade crítica."

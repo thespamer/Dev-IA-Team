@@ -4,38 +4,79 @@ A framework that simulates a complete software engineering team using AI agents 
 
 ---
 
-## How It Works
+## Structure
 
 ```
 agents/
-├── SUPERVISOR.md          # System prompt for the orchestrator agent
-├── activate.sh            # Activates a pod: loads role + memory + task
+├── SUPERVISOR.md              # Orchestrator — activated via ./activate.sh supervisor
+├── activate.sh                # Main script: loads role + memory + task → prints to stdout
+├── status.sh                  # Shows task history across all pods
+├── update_memory.sh           # Saves AI output back into pod memory
+├── archive_memory.sh          # Archives old memory entries to keep context lean
+├── run_chain.sh               # Step-by-step chain runner with ENTER prompts
+│
+├── chains/                    # Ready-to-use chain files
+│   ├── auth.chain             # Authentication system (4 steps)
+│   ├── ecommerce.chain        # E-commerce with Stripe (5 steps)
+│   └── saas-mvp.chain         # SaaS with billing + team management (5 steps)
+│
+├── context/
+│   └── shared/
+│       └── project.md         # Shared context — read by ALL pods on every activation
+│
 └── pods/
-    ├── po/                # Product Owner
-    │   ├── PROMPT.md      #   Role + skills + output format
-    │   └── memory.md      #   Persistent history of all past tasks
+    ├── po/
+    │   ├── PROMPT.md          # Role definition, skills, output formats, memory instructions
+    │   ├── memory.md          # Persistent task history + AI output summaries
+    │   └── context/           # Artifacts: user_stories.md, roadmap.md, decisions.md
     ├── backend/
+    │   ├── PROMPT.md
+    │   ├── memory.md
+    │   └── context/           # api_specs.md, schemas.md, services.md
     ├── frontend/
     ├── qa/
     ├── sec/
     └── devops/
 ```
 
-**The core loop:**
+---
+
+## How It Works
 
 ```
 1. You run: ./activate.sh <pod> "<task>"
-          ↓
-2. Terminal prints: SYSTEM PROMPT + MEMORY + TASK
-          ↓
-3. You paste the output into an AI chat (Claude, ChatGPT, etc.)
-          ↓
+            ↓
+2. Terminal prints: SYSTEM PROMPT + SHARED CONTEXT + INTER-POD ARTIFACTS + MEMORY + TASK
+            ↓
+3. You copy the full output → paste into AI chat (Claude, ChatGPT, etc.)
+            ↓
 4. The AI executes the task in the role of that pod
-          ↓
-5. memory.md is automatically updated with the task for next time
+            ↓
+5. memory.md is automatically updated with the task input
+            ↓
+6. You run: ./update_memory.sh <pod> "<summary of AI output>"
+            ↓
+7. Next pod activation will see all previous decisions in context
 ```
 
-No API keys. No server. Just bash + an AI chat session.
+No API keys. No server. No dependencies. Just bash + an AI chat.
+
+---
+
+## Quickstart
+
+```bash
+git clone https://github.com/thespamer/Dev-IA-Team.git
+cd Dev-IA-Team/agents
+
+# Fill in your project details (read by all pods)
+nano context/shared/project.md
+
+# Activate your first pod
+./activate.sh po "Define user stories for a login feature with email + social login"
+```
+
+The terminal prints everything. Copy it. Paste into your AI chat. Done.
 
 ---
 
@@ -49,393 +90,366 @@ No API keys. No server. Just bash + an AI chat session.
 | `qa` | Quality Assurance | Test plans, automation, bug triage, quality gates |
 | `sec` | Security Engineers | OWASP Top 10, OAuth2/JWT, vulnerability assessment |
 | `devops` | DevOps Analysts | CI/CD, Docker/K8s, Terraform, monitoring |
+| `supervisor` | Supervisor | Receives a "wish" and outputs the full execution plan |
 
 ---
 
-## Quickstart
+## Scripts
+
+### `activate.sh` — Activate a pod
 
 ```bash
-git clone https://github.com/thespamer/Dev-IA-Team.git
-cd Dev-IA-Team/agents
-chmod +x activate.sh
-
-# Activate any pod
-./activate.sh po "Create user stories for a login feature"
+./activate.sh [--dry-run] <pod> "<task>"
 ```
 
-Running the command prints everything to your terminal:
+| Flag | Effect |
+|------|--------|
+| *(none)* | Loads full context, updates `memory.md` with the task |
+| `--dry-run` | Loads and prints full context, **does NOT update memory** |
 
+```bash
+# Standard activation
+./activate.sh backend "Implement GET /api/v1/users with pagination"
+
+# Preview what context the pod would receive, without changing memory
+./activate.sh --dry-run backend "Implement GET /api/v1/users with pagination"
+
+# Activate the supervisor to get a full execution plan
+./activate.sh supervisor "I want to build a SaaS with auth, Stripe billing, and team management"
+```
+
+What the terminal shows:
 ```
 ╔══════════════════════════════════════════════════════════╗
-║  Product Owner Pod Activated
+║  Backend Developers Pod Activated
 ╚══════════════════════════════════════════════════════════╝
 
-[INFO] Pod: Product Owner (po)
-[INFO] Task: Create user stories for a login feature
+[INFO] Pod:  Backend Developers (backend)
+[INFO] Task: Implement GET /api/v1/users with pagination
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 === SYSTEM PROMPT ===
+[full role definition from PROMPT.md]
 
-# POD: Product Owner
-## Papel
-Responsável pelo roadmap, priorização e definição de valor...
-[full role definition]
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+=== SHARED PROJECT CONTEXT ===
+[content of context/shared/project.md — your tech stack, decisions]
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+
+=== INTER-POD ARTIFACTS (outputs de outros pods) ===
+--- api_spec ---
+[content of context/shared/api_spec.md — if it exists]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 === MEMORY (Contexto Persistente) ===
-
-[everything this pod has done before]
+[full task history from memory.md]
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 === TASK TO EXECUTE ===
-
-Create user stories for a login feature
+Implement GET /api/v1/users with pagination
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
 ✓ Pod ativado com sucesso
-[NOTE] A memória do pod foi atualizada com a tarefa
+[NOTE] memory.md atualizado com a tarefa
+[TIP]  Após receber a resposta da IA, salve o output:
+       ./update_memory.sh backend "<resumo das decisões>"
 ```
 
-Copy the full output → paste into Claude (or any AI chat) → the AI responds as that pod.
-
 ---
 
-## Examples: Full Chain in Practice
+### `update_memory.sh` — Save AI output to memory
 
-Below are three complete examples. For each one you'll see:
-- The **wish** you type
-- The **exact terminal commands** to run, step by step
-- What each pod produces
-
----
-
-### Example 1 — "I want a user login system"
-
-**Your wish:**
-> "Build a complete user authentication system: registration, login, logout, password recovery."
-
-**Step 1 — Product Owner defines the work**
+After the AI responds, save the key decisions so the next pod sees them:
 
 ```bash
-cd Dev-IA-Team/agents
-
-./activate.sh po "Define user stories for a user authentication system: registration, login, logout, and password recovery. Use MoSCoW prioritization and define the MVP scope."
+./update_memory.sh <pod> "<summary>"
 ```
-
-Paste output into AI chat. The PO pod responds with:
-- `US-001`: As a visitor, I want to register with email + password *(Must Have)*
-- `US-002`: As a user, I want to log in *(Must Have)*
-- `US-003`: As a user, I want to recover my password by email *(Must Have)*
-- `US-004`: As a user, I want to log in with Google *(Should Have)*
-- MVP = US-001, US-002, US-003 | Phase 2 = US-004
-
----
-
-**Step 2a — Backend builds the API** *(run in parallel with step 2b)*
 
 ```bash
-./activate.sh backend "Implement the authentication API based on user stories US-001 to US-003:
-- POST /api/v1/auth/register (email, password, name)
-- POST /api/v1/auth/login (returns JWT + refresh token)
-- POST /api/v1/auth/logout (invalidates token)
-- POST /api/v1/auth/forgot-password (sends recovery email)
-- POST /api/v1/auth/reset-password (validates token, sets new password)
-Use bcrypt for passwords. Define the users and sessions DB schemas."
+./update_memory.sh backend "API de auth implementada: POST /auth/login retorna JWT RS256 1h,
+POST /auth/register com bcrypt 12 rounds. Schema users (id, email, password_hash, name).
+AuthService com register/login/logout/resetPassword."
+
+./update_memory.sh po "US-001 a US-005 criadas. MVP = auth + dashboard (Must Have).
+Phase 2 = billing + social login (Should Have). Total: 18 story points no MVP."
 ```
 
-Paste output into AI chat. Backend pod responds with:
-- OpenAPI spec for all 5 endpoints
-- `users` table schema (id, email, password_hash, name, created_at)
-- `sessions` table schema (id, user_id, token_hash, expires_at)
-- `AuthService` with methods: `register()`, `login()`, `logout()`, `resetPassword()`
+The summary is appended to `memory.md` and will be visible to all future activations of that pod.
 
 ---
 
-**Step 2b — Frontend builds the UI** *(run in parallel with step 2a)*
+### `status.sh` — View task history
 
 ```bash
-./activate.sh frontend "Build the authentication UI components:
-- LoginForm (email, password fields, submit, error states)
-- RegisterForm (name, email, password, confirm password, validation)
-- ForgotPasswordForm (email field, success confirmation)
-- ResetPasswordForm (new password, confirm, token from URL)
-Use React + Tailwind. All components must meet WCAG 2.1 AA."
+./status.sh           # Summary of all pods
+./status.sh backend   # Full history of a specific pod
 ```
 
-Paste output into AI chat. Frontend pod responds with:
-- Component spec for each form (props, states, validation rules)
-- `LoginPage` and `RegisterPage` layout definitions
-- Loading, error, success states for each form
-- ARIA labels and keyboard navigation for all inputs
+Output example:
+```
+╔══════════════════════════════════════════════════════════╗
+║  Dev-IA-Team — Status Geral                              ║
+╚══════════════════════════════════════════════════════════╝
+
+● [po]       Product Owner
+    Tasks: 3  |  Última: 2026-03-18 14:30:00
+    └─ Define user stories for auth: register, login, logout, password...
+
+● [backend]  Backend Developers
+    Tasks: 2  |  Última: 2026-03-18 15:10:00
+    └─ Implement auth API: POST /auth/register, POST /auth/login...
+
+○ [frontend] Frontend Developers  (sem tarefas)
+○ [qa]       Quality Assurance    (sem tarefas)
+
+Total de tarefas executadas: 5
+
+=== Artefatos Compartilhados (2) ===
+  project.md     (45 linhas)
+  api_spec.md    (120 linhas)
+```
 
 ---
 
-**Step 3 — QA writes the test plan**
+### `run_chain.sh` — Step-by-step chain runner
+
+Guides you through a multi-step chain, one step at a time, pausing for confirmation:
 
 ```bash
-./activate.sh qa "Create a test plan for the authentication system (US-001 to US-003).
-Cover:
-- Unit tests: password hashing, token generation, email validation
-- Integration tests: all 5 API endpoints with valid and invalid inputs
-- E2E tests: full register → login → logout flow and password recovery flow
-- Edge cases: duplicate email on register, expired reset token, wrong password 3 times
-Quality gate: 80% code coverage, 0 open critical bugs before release."
+./run_chain.sh chains/auth.chain
+./run_chain.sh chains/ecommerce.chain
+./run_chain.sh chains/saas-mvp.chain
+./run_chain.sh my-project.chain        # your own chain
 ```
 
-Paste output into AI chat. QA pod responds with:
-- Test plan document with scope and out-of-scope
-- 25 test cases with steps, expected results, and test type
-- Quality gate checklist for the pipeline
+What it looks like:
+```
+╔══════════════════════════════════════════════════════════╗
+║  Chain Runner — Authentication System
+╚══════════════════════════════════════════════════════════╝
+
+  Chain file:  chains/auth.chain
+  Total steps: 4 (2 parallel)
+
+Pressione ENTER para começar...
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Step 1 of 4
+
+Execute no terminal:
+
+  ./activate.sh po "Define user stories para auth..."
+
+Depois:
+  1. Copie o output completo
+  2. Cole no seu chat de IA
+  3. Salve o resultado: ./update_memory.sh po "<resumo>"
+
+Pressione ENTER quando estiver pronto para o próximo step...
+
+━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
+Step 2 of 4  (PARALELO — abra terminais separados)
+
+Terminal 1:
+  ./activate.sh backend "Implemente API de auth..."
+
+Terminal 2:
+  ./activate.sh frontend "Construa UI de auth..."
+
+Pressione ENTER quando TODOS os terminais paralelos estiverem concluídos...
+```
 
 ---
 
-**Step 4 — Security reviews the implementation**
+### `archive_memory.sh` — Keep memory lean
+
+When `memory.md` grows too large (old context can exceed LLM limits), archive old entries:
 
 ```bash
-./activate.sh sec "Security review of the authentication system:
-- Check OWASP A07:2021 (Authentication Failures): brute force, weak passwords
-- Review JWT implementation: algorithm (no 'none'), expiration, refresh rotation
-- Check bcrypt rounds (should be >= 12)
-- Validate password reset flow: token entropy, expiration time, single-use
-- Rate limiting on /login and /register endpoints
-- Check for user enumeration on /forgot-password response"
+./archive_memory.sh                     # Archive all pods, keep last 20 tasks each
+./archive_memory.sh backend             # Archive only backend
+./archive_memory.sh backend --keep=10   # Keep only last 10 tasks in backend
 ```
 
-Paste output into AI chat. Sec pod responds with:
-- Security review with OWASP checklist
-- Findings table (e.g., "no rate limiting on /login — HIGH severity")
-- Mitigations for each finding
-- Approval status: Pending (2 issues to fix before deploy)
+Old entries are moved to `memory_archive.md`. The structured header (project info, schemas, etc.) is always preserved.
 
 ---
 
-**Step 5 — DevOps sets up the pipeline**
+## Inter-Pod Communication via Shared Context
+
+Pods share information through `context/shared/`:
+
+```
+context/shared/
+├── project.md     ← Fill this in once — read by ALL pods on every activation
+├── api_spec.md    ← Backend writes here after defining the API
+├── user_stories.md ← PO writes here for other pods to read
+└── [any .md file] ← Any file here is loaded by activate.sh as "INTER-POD ARTIFACTS"
+```
+
+**Example flow:**
 
 ```bash
-./activate.sh devops "Set up CI/CD for the authentication service:
-- Dockerfile: multi-stage build, non-root user, minimal image
-- GitHub Actions pipeline: lint → unit tests → integration tests → security scan → build image → deploy to staging
-- Quality gates in the pipeline matching QA's plan (80% coverage)
-- Alert: notify on > 10 failed logins/minute (possible brute force)"
+# Step 1: Backend defines and saves the API spec
+./activate.sh backend "Design auth API. Save spec to context/shared/api_spec.md"
+# AI responds with full API spec, instructs you to save it
+cp pods/backend/context/api_specs.md context/shared/api_spec.md
+
+# Step 2: Frontend automatically receives the API spec
+./activate.sh frontend "Build auth UI components"
+# activate.sh loads context/shared/api_spec.md under "=== INTER-POD ARTIFACTS ==="
+# The frontend AI now knows all endpoints, request/response formats, auth headers
 ```
-
-Paste output into AI chat. DevOps pod responds with:
-- `Dockerfile` spec (multi-stage, node:alpine, non-root)
-- GitHub Actions YAML (5 stages, quality gates)
-- Monitoring alert rule for brute-force detection
-
----
-
-**Full chain summary for this wish:**
-
-```bash
-# 1 — Define work
-./activate.sh po "Define user stories for registration, login, logout, password recovery. MoSCoW."
-
-# 2 — Build in parallel (open two terminals or run sequentially)
-./activate.sh backend "Implement auth API: register, login, logout, forgot-password, reset-password. JWT + bcrypt. Define users and sessions schemas."
-./activate.sh frontend "Build auth forms: LoginForm, RegisterForm, ForgotPasswordForm, ResetPasswordForm. React + Tailwind. WCAG 2.1 AA."
-
-# 3 — Validate
-./activate.sh qa "Test plan for auth: unit, integration, E2E. Edge cases. Quality gate: 80% coverage."
-./activate.sh sec "OWASP review: brute force, JWT, bcrypt, reset token, rate limiting, user enumeration."
-
-# 4 — Ship
-./activate.sh devops "Dockerfile + GitHub Actions CI/CD + quality gates + brute-force alert."
-```
-
----
-
-### Example 2 — "I want an e-commerce with Stripe"
-
-**Your wish:**
-> "Build an e-commerce: product catalog, cart, Stripe checkout, order tracking."
-
-```bash
-# 1 — Product Owner
-./activate.sh po "User stories for e-commerce: browse products, search with filters, add to cart, Stripe checkout, view order history and status. Define MVP (3 phases)."
-
-# 2a — Backend (parallel)
-./activate.sh backend "E-commerce API:
-- GET /products (list with search, filters, pagination)
-- GET /products/:id
-- POST /cart/items, DELETE /cart/items/:id, GET /cart
-- POST /checkout/session (create Stripe session)
-- POST /checkout/webhook (Stripe webhook handler)
-- GET /orders, GET /orders/:id
-Schemas: products, cart_items, orders, order_items, payments."
-
-# 2b — Frontend (parallel)
-./activate.sh frontend "E-commerce UI:
-- ProductGrid + ProductCard + ProductDetail
-- SearchBar with category/price filters
-- CartDrawer (slide-in) + CartItem
-- CheckoutPage with Stripe Elements
-- OrderHistory + OrderTimeline
-Mobile-first responsive. SSR on product pages for SEO."
-
-# 3 — Security
-./activate.sh sec "E-commerce security review:
-- Stripe webhook: validate signature header
-- Price tampering: server-side price validation (never trust frontend)
-- PCI DSS awareness: ensure no card data is stored or logged
-- SQL injection on search/filter params
-- CSRF on checkout form
-- Rate limiting on checkout endpoint"
-
-# 4 — QA
-./activate.sh qa "E-commerce test plan:
-- Cart: add, remove, update quantity, empty cart, max items
-- Checkout: successful Stripe payment, declined card, network error
-- Order status transitions: pending → paid → shipped → delivered
-- Concurrent cart updates from same user (race condition)
-- Stripe test mode card scenarios (4242, 4000 decline codes)"
-
-# 5 — DevOps
-./activate.sh devops "E-commerce infra:
-- Docker Compose (backend, frontend, postgres, redis for cart)
-- GitHub Actions: test → build → staging → production with manual gate
-- CDN for product images (S3 + CloudFront)
-- Auto-scaling rule: scale out at 70% CPU
-- Alert: payment failure rate > 5% in 5 minutes"
-```
-
----
-
-### Example 3 — "I want a real-time monitoring dashboard"
-
-**Your wish:**
-> "Build an internal dashboard to monitor our microservices: health, latency, error rates, and logs."
-
-```bash
-# 1 — Product Owner
-./activate.sh po "Requirements for an internal observability dashboard. Users: SRE team + on-call engineers. Features: service health overview, latency p50/p95/p99, error rate trends, searchable logs, configurable alert rules."
-
-# 2a — Backend (parallel)
-./activate.sh backend "Dashboard API:
-- GET /services (list all services with health status)
-- GET /services/:id/metrics (latency, error rate, request rate from Prometheus)
-- GET /logs (query Loki with filters: service, level, time range, text search)
-- CRUD /alerts (user-defined alert rules)
-- WebSocket /ws/metrics (push live metric updates every 5s)"
-
-# 2b — DevOps (parallel — sets up the infra the backend reads from)
-./activate.sh devops "Observability stack:
-- Prometheus config for scraping all microservices
-- Loki for log aggregation with service labels
-- Grafana provisioning (datasources + base dashboards)
-- Alertmanager for alert routing
-- Define SLIs/SLOs: availability 99.9%, p95 latency < 300ms, error rate < 1%
-Deliver as Terraform modules."
-
-# 3 — Frontend
-./activate.sh frontend "Monitoring dashboard UI:
-- ServiceGrid: cards showing service name, health dot (green/yellow/red), uptime
-- LatencyChart: timeseries with p50/p95/p99 lines (recharts or chart.js)
-- ErrorRateGraph: bar chart with threshold line
-- LogViewer: virtualized list, filters by level/service, text search, syntax highlight
-- AlertRuleEditor: form to create/edit alert rules
-Dark theme. Auto-refresh via WebSocket. Keyboard shortcuts for power users."
-
-# 4 — Security + QA (parallel)
-./activate.sh sec "Dashboard security: internal-only access enforcement (SSO/VPN), what log data is exposed (PII scrubbing), alert rule injection prevention, API authentication (service accounts vs user tokens), audit log for alert rule changes."
-
-./activate.sh qa "Dashboard test plan:
-- Metric accuracy: compare dashboard values with direct Prometheus queries
-- Log search performance: 10M+ log entries, search latency < 2s
-- WebSocket: reconnection on network drop, data consistency on reconnect
-- Dashboard load time: < 2s for 30-day metric range
-- Alert rule CRUD: create, trigger, resolve, delete flow
-- Accessibility: keyboard navigation through all panels"
-```
-
----
-
-## Supervisor Mode
-
-Instead of deciding which pods to activate yourself, load the Supervisor as the AI's system prompt and just describe your wish.
-
-**How to use:**
-1. Open Claude (or any AI chat)
-2. Set the contents of `agents/SUPERVISOR.md` as the system prompt
-3. Type your wish
-
-**Example input:**
-```
-I want to build a SaaS with user authentication, Stripe billing (free/pro plans),
-a team management feature (invite members, roles), and a usage analytics dashboard.
-```
-
-**The Supervisor responds with the full execution plan:**
-```
-## Execution Plan
-
-### Step 1 — PO (run first)
-Command:
-./activate.sh po "Define user stories for: auth system, Stripe billing with
-free/pro plans, team management (invite, roles), usage analytics dashboard.
-3-phase MVP roadmap."
-
-### Step 2 — Parallel execution
-Command A:
-./activate.sh backend "..."
-
-Command B:
-./activate.sh frontend "..."
-
-### Step 3 — Validation (parallel)
-Command A:
-./activate.sh qa "..."
-
-Command B:
-./activate.sh sec "..."
-
-### Step 4 — Infrastructure
-Command:
-./activate.sh devops "..."
-
-Pods involved: po, backend, frontend, qa, sec, devops
-Total steps: 4 (2 parallel stages)
-```
-
-Then you run each command, paste the output into the AI, and collect the artifacts.
 
 ---
 
 ## Memory System
 
-Every time you run `activate.sh`, it appends the task to the pod's `memory.md`:
+Every pod has a `memory.md` that grows over time:
 
-```markdown
+```
+# Backend - Memória Persistente
+
+## Projeto Atual
+Node.js + Express, PostgreSQL 15, JWT RS256
+
+## Endpoints
+| Method | Path | Descrição | Status |
+...
+
 ## Tarefa Executada em 2026-03-18 10:30:00
-**Task**: Define user stories for registration and login
+**Task**: Design auth API: register, login, logout endpoints
 
-## Tarefa Executada em 2026-03-19 09:15:00
-**Task**: Add social login stories (Google, GitHub) to Phase 2
+### Output salvo em 2026-03-18 10:45:00
+Implementada API de auth: POST /auth/login retorna JWT RS256 1h.
+Schema users criado com bcrypt 12 rounds. AuthService com 4 métodos.
+
+## Tarefa Executada em 2026-03-18 14:00:00
+**Task**: Add rate limiting to auth endpoints
+
+### Output salvo em 2026-03-18 14:20:00
+Rate limiting: 5 tentativas/min no /login, 3/min no /register. Redis para counters.
 ```
 
-On the next activation, the AI sees the full history — previous decisions, implemented features, defined schemas — and continues with full context.
-
-To reset a pod's memory, clear the content of `memory.md` (keep the file).
+The task input is saved automatically by `activate.sh`. The AI output summary is saved by you via `update_memory.sh`. Together they create a full audit trail.
 
 ---
 
-## Output Artifacts
+## Example: Full Chain in Practice
 
-Each pod produces structured outputs saved to its `context/` directory:
+**Your wish:** "Build a user authentication system with registration, login, logout, and password recovery."
 
-| Pod | Artifacts |
-|-----|-----------|
-| `po` | `context/user_stories.md`, `context/roadmap.md`, `context/decisions.md` |
-| `backend` | `context/api_specs.md`, `context/schemas.md`, `context/services.md` |
-| `frontend` | `context/components.md`, `context/pages.md`, `context/design_tokens.md` |
-| `qa` | `context/test_plans.md`, `context/bugs.md`, `context/test_results.md` |
-| `sec` | `context/security_reviews.md`, `context/vulnerabilities.md`, `context/policies.md` |
-| `devops` | `context/pipelines.md`, `context/docker.md`, `context/infrastructure.md`, `context/monitoring.md` |
+**Step 1 — Terminal:** run the chain runner
+```bash
+cd agents
+./run_chain.sh chains/auth.chain
+```
+
+Or run manually, step by step:
+
+```bash
+# Step 1 — PO defines the work
+./activate.sh po "Define user stories for authentication: register (email + password),
+login, logout, password recovery. MoSCoW: register + login + recovery = Must Have.
+Social login = Should Have (Phase 2). Define acceptance criteria for each story."
+# → Paste output into AI → get user stories US-001 to US-006
+./update_memory.sh po "US-001 register, US-002 login, US-003 logout, US-004 recovery criadas.
+MVP = US-001 a US-004 (Must Have). Social login Phase 2. Total 12 story points."
+
+# Step 2a — Backend (open Terminal 1)
+./activate.sh backend "Implement auth API based on user stories US-001 to US-004:
+POST /api/v1/auth/register (email, password, name → JWT),
+POST /api/v1/auth/login (email, password → JWT + refresh token),
+POST /api/v1/auth/logout (invalidate refresh token),
+POST /api/v1/auth/forgot-password (send recovery email),
+POST /api/v1/auth/reset-password (token + new password).
+Use bcrypt rounds=12. Define schemas: users, sessions.
+Save API spec to context/shared/api_spec.md"
+# → Paste output into AI → get API spec, schemas, AuthService
+./update_memory.sh backend "5 endpoints auth implementados. JWT RS256 1h, refresh 7d com rotação.
+Schema users (id, email, password_hash, name, created_at), sessions (id, user_id, expires_at).
+AuthService: register, login, logout, resetPassword."
+cp pods/backend/context/api_specs.md context/shared/api_spec.md
+
+# Step 2b — Frontend (open Terminal 2, run in parallel with 2a)
+./activate.sh frontend "Build auth UI: LoginForm (email, password, loading/error states),
+RegisterForm (name, email, password, confirm, validation), ForgotPasswordForm,
+ResetPasswordForm. React + Tailwind. WCAG 2.1 AA. All forms need loading, error, success states."
+# → Paste output into AI → get component specs
+./update_memory.sh frontend "4 componentes de auth criados: LoginForm, RegisterForm,
+ForgotPasswordForm, ResetPasswordForm. Design tokens definidos. ARIA labels em todos os inputs."
+
+# Step 3a — QA (Terminal 1)
+./activate.sh qa "Test plan for auth system: unit (hash, token gen, email validation),
+integration (all 5 endpoints: valid + invalid inputs), E2E (full register→login→logout flow,
+password recovery flow). Edge cases: duplicate email, expired token, wrong password 3x.
+Quality gate: 80% coverage, 0 open critical bugs."
+./update_memory.sh qa "Test plan criado: 28 casos de teste. Unit 15, integration 8, E2E 5.
+Quality gate: 80% cobertura, 0 bugs críticos. Automação: Jest + Playwright."
+
+# Step 3b — Security (Terminal 2, run in parallel with 3a)
+./activate.sh sec "OWASP review of auth system: A07 brute force (rate limiting on /login),
+JWT implementation (RS256, no 'none', 1h expiry, refresh rotation),
+bcrypt rounds >= 12, reset token (entropy, 15min expiry, single-use),
+user enumeration on /forgot-password (same response for existing/non-existing email)."
+./update_memory.sh sec "Security review auth: 3 findings. HIGH: no rate limiting (fix before deploy).
+MEDIUM: reset token expiry 1h (should be 15min). LOW: password complexity not enforced.
+JWT RS256 OK. bcrypt 12 rounds OK."
+
+# Step 4 — DevOps
+./activate.sh devops "CI/CD for auth service: Dockerfile (multi-stage, node:alpine, non-root user,
+< 100MB), GitHub Actions (lint → unit tests → integration tests → trivy scan → build → staging →
+manual gate → prod). Quality gates: 80% coverage, 0 critical CVEs.
+Alert: > 10 failed logins/minute (brute force detection)."
+./update_memory.sh devops "Dockerfile multi-stage criado: 82MB final. Pipeline GitHub Actions 6 stages.
+Quality gates configurados. Alert brute-force no Prometheus/AlertManager."
+```
+
+---
+
+## Creating a Custom Chain File
+
+```bash
+# Create your chain file
+cat > chains/my-feature.chain << 'EOF'
+name=My Feature
+
+# PO always first
+step po "Define user stories for [your feature]..."
+
+# Parallel when independent
+parallel backend "Build the API for [feature]..." | frontend "Build the UI for [feature]..."
+
+# Parallel reviews
+parallel qa "Test plan for [feature]..." | sec "Security review for [feature]..."
+
+# DevOps last
+step devops "CI/CD and infrastructure for [feature]..."
+EOF
+
+# Run it
+./run_chain.sh chains/my-feature.chain
+```
+
+---
+
+## Requirements
+
+- **Bash** (for all scripts)
+- **An AI assistant** (Claude, ChatGPT, or any LLM) to execute the loaded context
+
+```bash
+git clone https://github.com/thespamer/Dev-IA-Team.git
+cd Dev-IA-Team/agents
+nano context/shared/project.md   # fill in your project
+./activate.sh supervisor "I want to build [your project description]"
+```
 
 ---
 

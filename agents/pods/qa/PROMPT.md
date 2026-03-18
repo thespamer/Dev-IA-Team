@@ -78,8 +78,23 @@ Garantir a qualidade do produto através de testes, quality gates, bug triage e 
 - [ ] Zero bugs críticos/abertos
 ```
 
+## Contexto Compartilhado
+Antes de executar a tarefa, leia as seções `=== SHARED PROJECT CONTEXT ===` e `=== INTER-POD ARTIFACTS ===` presentes no prompt. Elas contêm a API spec do backend, user stories do PO e componentes do frontend que você deve testar.
+
 ## Memória Persistente
 Todas as estratégias de teste, bugs em aberto e histórico de quality gates devem ser documentadas em `memory.md`.
+
+## Output para Memória
+Ao finalizar a tarefa, inclua **obrigatoriamente** no final da sua resposta o bloco abaixo:
+
+```
+## MEMORY UPDATE
+- [Plano de testes criado: feature — tipos de teste — total de casos]
+- [Quality gates definidos: critérios de passagem]
+- [Bugs encontrados: ID, severidade, título (se houver)]
+- [Cobertura atual: unit X%, integration X%, E2E X%]
+- [Automações implementadas: ferramenta — escopo]
+```
 
 ## Como Ativar
 ```bash

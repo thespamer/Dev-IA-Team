@@ -1,0 +1,16 @@
+name=E-commerce with Stripe
+
+# Step 1: PO define o escopo em 3 fases
+step po "Defina user stories para um e-commerce completo: navegar produtos com busca e filtros (categoria, preço, avaliação), carrinho de compras (adicionar, remover, atualizar quantidade), checkout com Stripe (cartão, PIX), histórico de pedidos, rastreamento de status do pedido. Organize em 3 fases: MVP (catálogo + carrinho + checkout), Fase 2 (avaliações + wishlist), Fase 3 (programa de fidelidade). MoSCoW para cada story."
+
+# Step 2: Backend e Frontend em paralelo
+parallel backend "Implemente APIs do e-commerce: GET /products (lista com busca fulltext, filtros por categoria/preço/rating, paginação), GET /products/:id, POST /cart/items, PUT /cart/items/:id, DELETE /cart/items/:id, GET /cart, POST /checkout/session (cria Stripe Checkout Session), POST /checkout/webhook (valida assinatura Stripe, processa pagamento), GET /orders, GET /orders/:id. Schemas: products, categories, cart_items (user_id, product_id, qty), orders, order_items, payments. Salve spec em context/shared/api_spec.md" | frontend "Construa UI do e-commerce: ProductGrid (grid responsivo de cards), ProductCard (imagem, nome, preço, rating, add-to-cart), ProductDetail (galeria, descrição, variantes, reviews), SearchBar com filtros (dropdown categoria, range preço, min rating), CartDrawer (slide-in lateral com items, subtotal, checkout CTA), CheckoutPage com Stripe Elements, OrderHistory com paginação, OrderTimeline (status visual). Mobile-first, SSR nas páginas de produto para SEO."
+
+# Step 3: Security primeiro (pagamentos = crítico)
+step sec "Review de segurança do e-commerce com foco em pagamentos: validação de assinatura do webhook Stripe (Stripe-Signature header obrigatório), manipulação de preço do lado servidor (nunca confiar no frontend — sempre buscar preço do DB), PCI DSS awareness (não armazenar dados de cartão, não logar), SQL injection nos parâmetros de busca/filtro, CSRF no checkout, rate limiting no checkout, logs de auditoria para todas as transações financeiras."
+
+# Step 4: QA testa fluxo de pagamento (após sec review)
+step qa "Plano de testes para e-commerce: carrinho (adicionar, remover, atualizar, esvaziar, máximo de items, produto esgotado), checkout com Stripe test mode (cartão 4242 sucesso, 4000 recusa, 4000 autenticação 3DS), transições de status do pedido (pending → paid → shipped → delivered → cancelled), webhook retry do Stripe (idempotência), atualizações concorrentes no carrinho, busca com caracteres especiais, filtros combinados. Load test: 500 usuários simultâneos no catálogo."
+
+# Step 5: DevOps infraestrutura de produção
+step devops "Infraestrutura para e-commerce: Docker Compose (backend, frontend Next.js, postgres, redis para carrinho e sessões), GitHub Actions com promoção staging → prod e gate manual, CDN para imagens de produto (S3 + CloudFront), auto-scaling: scale out a 70% CPU, scale in após 10min abaixo de 30%. Monitoramento: alert taxa de falha no pagamento > 5% em 5min (crítico), alert tempo de checkout > 3s (warning). Terraform para S3 + CloudFront + RDS."

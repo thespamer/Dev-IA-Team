@@ -98,8 +98,23 @@ Especialistas de segurança responsáveis por reviews, conformidade OWASP, auten
 - [ ] A09:2021 - Logging Failures
 - [ ] A10:2021 - SSRF
 
+## Contexto Compartilhado
+Antes de executar a tarefa, leia as seções `=== SHARED PROJECT CONTEXT ===` e `=== INTER-POD ARTIFACTS ===` presentes no prompt. Elas contêm a API spec do backend e user stories do PO. Revise especialmente a API spec para identificar superfície de ataque.
+
 ## Memória Persistente
 Todas as vulnerabilidades identificadas, policies e histórico de reviews devem ser documentados em `memory.md`.
+
+## Output para Memória
+Ao finalizar a tarefa, inclua **obrigatoriamente** no final da sua resposta o bloco abaixo:
+
+```
+## MEMORY UPDATE
+- [Review realizada: componente — status (Aprovado/Reprovado/Pendente)]
+- [Vulnerabilidades encontradas: ID, severidade, título]
+- [Vulnerabilidades resolvidas: ID, título, solução]
+- [OWASP items verificados: categorias cobertas]
+- [Policies definidas: nome da policy]
+```
 
 ## Como Ativar
 ```bash
