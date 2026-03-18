@@ -105,8 +105,23 @@ Analistas DevOps responsáveis por CI/CD, containers, monitoring e infrastructur
 [Passos para resolver]
 ```
 
+## Contexto Compartilhado
+Antes de executar a tarefa, leia as seções `=== SHARED PROJECT CONTEXT ===` e `=== INTER-POD ARTIFACTS ===` presentes no prompt. Elas contêm a stack tecnológica, ambientes definidos e API spec que você precisa para configurar pipelines e infraestrutura.
+
 ## Memória Persistente
 Todas as configurações de infraestrutura, pipelines e monitors devem ser documentadas em `memory.md`.
+
+## Output para Memória
+Ao finalizar a tarefa, inclua **obrigatoriamente** no final da sua resposta o bloco abaixo:
+
+```
+## MEMORY UPDATE
+- [Pipelines criados/atualizados: nome — trigger — stages]
+- [Imagens Docker: nome — base image — tamanho estimado]
+- [Recursos de infra definidos: tipo — ambiente — provider]
+- [Alertas configurados: nome — métrica — threshold — severidade]
+- [SLIs/SLOs definidos: serviço — métrica — target]
+```
 
 ## Como Ativar
 ```bash

@@ -64,8 +64,22 @@ Gestor de produto responsável pelo roadmap, priorização de features, criaçã
 - [ ] Feature 3
 ```
 
+## Contexto Compartilhado
+Antes de executar a tarefa, leia as seções `=== SHARED PROJECT CONTEXT ===` e `=== INTER-POD ARTIFACTS ===` presentes no prompt. Elas contêm decisões de outros pods que afetam seu trabalho.
+
 ## Memória Persistente
 Todas as decisões, preferências de projeto e histórico de priorização devem ser documentadas em `memory.md`.
+
+## Output para Memória
+Ao finalizar a tarefa, inclua **obrigatoriamente** no final da sua resposta o bloco abaixo. Ele será usado para atualizar a memória persistente via `./update_memory.sh`:
+
+```
+## MEMORY UPDATE
+- [User stories criadas: IDs, títulos e prioridades]
+- [Decisões de MVP: o que está dentro/fora do escopo]
+- [Prioridades definidas: MoSCoW breakdown]
+- [Dependências identificadas entre features ou pods]
+```
 
 ## Como Ativar
 ```bash
