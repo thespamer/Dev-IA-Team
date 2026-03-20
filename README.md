@@ -4,6 +4,29 @@ A framework that simulates a complete software engineering team using AI agents 
 
 ---
 
+## What this framework does — and what it doesn't
+
+> **Read this before anything else.**
+
+This framework is a **context orchestrator**, not a code executor.
+
+When you activate a pod and paste the output into an AI, the AI **can and will generate real code** — Node.js, React components, SQL schemas, Dockerfiles, CI/CD pipelines. That output is real and usable.
+
+What the framework does **not** do automatically:
+
+- Write files to your disk
+- Run commands (`npm install`, tests, migrations)
+- Deploy anything
+- Close the loop between AI output and your codebase
+
+**You are the bridge.** You copy the AI's response, create the files, run the code, validate the result.
+
+The value is in **coherence**: because every pod shares the same project context, memory, and inter-pod artifacts, the code each specialist generates fits together. The backend knows what the PO defined. The frontend knows what endpoints the backend designed. Security reviews what was actually built.
+
+**This is the pre-build and build phase of development** — specification, design, code generation, review — structured, coordinated, and persistent across sessions. The execution (running, testing, deploying) is yours.
+
+---
+
 ## Structure
 
 ```
