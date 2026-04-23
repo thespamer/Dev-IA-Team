@@ -1,0 +1,13 @@
+name=Dev-IA-Team Improvements Plan
+
+# Step 1: Planejamento funcional e priorizacao
+step po "Defina backlog de melhorias do framework Dev-IA-Team em 3 fases (Quick Wins, Hardening, Escala), com criterios de aceite, dependencias e estimativas em story points. Priorize com MoSCoW e proponha um MVP de melhoria para 7 dias."
+
+# Step 2: Implementacao tecnica de scripts (com base no backlog do PO)
+step backend "Proponha e detalhe implementacao tecnica para hardening dos scripts shell do Dev-IA-Team: lock de escrita para memory.md, parser resiliente para run_chain.sh, validacao basica de contrato para MEMORY UPDATE, e estrategia de testes automatizados para scripts."
+
+# Step 3: QA e Security em paralelo para validar robustez
+parallel qa "Crie plano de testes para os scripts do Dev-IA-Team cobrindo: testes funcionais de activate/update/status/chain/archive, testes de concorrencia de escrita em memoria, regressao dos chain files existentes e criterios de quality gate para CI." | sec "Realize review de seguranca dos scripts shell do Dev-IA-Team focando em validacao de input, quote safety, risco de command injection, permissao de arquivos de memoria e protecoes recomendadas para execucao local segura."
+
+# Step 4: DevOps fecha automacao e governanca
+step devops "Defina pipeline CI para o Dev-IA-Team com shellcheck, testes de scripts e quality gates obrigatorios. Inclua estrategia de release, versionamento semantico e checklist de contribuicao para repositorio open source."

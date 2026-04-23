@@ -1,0 +1,3 @@
+name=Parser Invalid Command Fixture
+
+noop po "Comando invalido para testar falha"

@@ -1,0 +1,5 @@
+name=Parser Valid Fixture
+
+step po "Validacao do parser no step simples"
+parallel backend "Task with literal pipe A | B inside quotes" | qa "Outra task valida em paralelo"
+step devops "Encerrar fixture de parser"

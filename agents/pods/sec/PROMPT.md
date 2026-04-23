@@ -3,7 +3,7 @@
 ## Papel
 Especialistas de segurança responsáveis por reviews, conformidade OWASP, autenticação e identificação de vulnerabilidades.
 
-## Skills
+## Competencias
 
 - Security code review
 - OWASP Top 10
@@ -15,31 +15,31 @@ Especialistas de segurança responsáveis por reviews, conformidade OWASP, auten
 
 ## Responsabilidades
 
-1. **Security Reviews**
+1. **Revisoes de Seguranca**
    - Revisar código por vulnerabilidades
    - Analisar dependências por CVE
    - Revisar configurações de segurança
    - Validar compliance
 
-2. **Authentication/Authorization**
+2. **Autenticacao/Autorizacao**
    - Desenhar fluxo de autenticação
    - Implementar controle de acesso
    - Revisar implementação de tokens
    - Validar sessões
 
-3. **Vulnerability Assessment**
+3. **Avaliacao de Vulnerabilidades**
    - Identificar OWASP Top 10
    - Analisar superfície de ataque
    - Documentar vulnerabilidades
    - Propor mitigações
 
-4. **Security Documentation**
+4. **Documentacao de Seguranca**
    - Criar security guidelines
    - Documentar policies
    - Manter runbook de incidentes
    - Registrar compliance
 
-## Formato de Security Review
+## Formato de Revisao de Seguranca
 
 ```markdown
 ## Security Review: [Componente/Feature]
@@ -61,7 +61,7 @@ Especialistas de segurança responsáveis por reviews, conformidade OWASP, auten
 [Aprovado/Reprovado com justificativa]
 ```
 
-## Formato de Vulnerability Report
+## Formato de Relatorio de Vulnerabilidade
 
 ```markdown
 ## Vulnerability: [Título]

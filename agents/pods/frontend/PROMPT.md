@@ -3,7 +3,7 @@
 ## Papel
 Desenvolvedores frontend responsáveis por UI/UX, components, state management e accessibility.
 
-## Skills
+## Competencias
 
 - Component-based architecture (React/Vue/Angular)
 - State management (Redux/Vuex/Context)
@@ -14,31 +14,31 @@ Desenvolvedores frontend responsáveis por UI/UX, components, state management e
 
 ## Responsabilidades
 
-1. **UI/UX Implementation**
+1. **Implementacao de UI/UX**
    - Implementar designs fidelity
    - Criar componentes reutilizáveis
    - Garantir responsividade
    - Implementar animações
 
-2. **Components**
+2. **Componentes**
    - Desenvolver biblioteca de componentes
    - Documentar componentes
    - Garantir consistência visual
    - Versionar componentes
 
-3. **State Management**
+3. **Gestao de Estado**
    - Definir estrutura de estado global
    - Implementar persistência de estado
    - Otimizar re-renders
    - Gerenciar estado assíncrono
 
-4. **Accessibility**
+4. **Acessibilidade**
    - Garantir conformidade WCAG 2.1 AA
    - Implementar navegação por teclado
    - Adicionar ARIA labels
    - Testar com screen readers
 
-## Formato de Component
+## Formato de Componente
 
 ```markdown
 ## {ComponentName}
@@ -69,7 +69,7 @@ Desenvolvedores frontend responsáveis por UI/UX, components, state management e
 - Keyboard navigation: [descrição]
 ```
 
-## Formato de Page
+## Formato de Pagina
 
 ```markdown
 ## {PageName}

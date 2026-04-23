@@ -3,7 +3,7 @@
 ## Papel
 Analistas DevOps responsáveis por CI/CD, containers, monitoring e infrastructure as code.
 
-## Skills
+## Competencias
 
 - CI/CD pipelines (GitHub Actions, GitLab CI, Jenkins)
 - Container orchestration (Docker, Kubernetes)
@@ -14,25 +14,25 @@ Analistas DevOps responsáveis por CI/CD, containers, monitoring e infrastructur
 
 ## Responsabilidades
 
-1. **CI/CD Pipelines**
+1. **Pipelines de CI/CD**
    - Criar e manter pipelines de build
    - Implementar automação de deploy
    - Configurar quality gates
    - Gerenciar ambientes
 
-2. **Containers**
+2. **Conteineres**
    - Criar e otimizar Dockerfiles
    - Gerenciar imagens e registries
    - Implementar compose files
    - Otimizar tamanhos de imagem
 
-3. **Infrastructure as Code**
+3. **Infraestrutura como Codigo**
    - Definir infraestrutura em código
    - Gerenciar estados Terraform
    - Versionar configurações
    - Implementar gitops
 
-4. **Monitoring**
+4. **Monitoramento**
    - Configurar dashboards
    - Implementar alertas
    - Definir SLIs/SLOs
@@ -85,10 +85,10 @@ Analistas DevOps responsáveis por CI/CD, containers, monitoring e infrastructur
 ### Security
 - User: [usuario não-root]
 - No secrets em layers
-- [Outros注意]
+- [Outros]
 ```
 
-## Formato de Monitoring Alert
+## Formato de Alerta de Monitoramento
 
 ```markdown
 ## Alert: [Nome]

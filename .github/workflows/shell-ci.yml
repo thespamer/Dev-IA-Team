@@ -1,0 +1,32 @@
+name: Shell CI
+
+on:
+  push:
+    branches:
+      - main
+  pull_request:
+
+jobs:
+  shell-quality:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Install shellcheck
+        run: sudo apt-get update && sudo apt-get install -y shellcheck
+
+      - name: Lint shell scripts
+        run: |
+          shellcheck agents/activate.sh
+          shellcheck agents/update_memory.sh
+          shellcheck agents/status.sh
+          shellcheck agents/run_chain.sh
+          shellcheck agents/archive_memory.sh
+          shellcheck agents/doctor.sh
+          shellcheck agents/tests/run_smoke_tests.sh
+          shellcheck agents/tests/lint_text_consistency.sh
+
+      - name: Run smoke tests
+        run: ./agents/tests/run_smoke_tests.sh

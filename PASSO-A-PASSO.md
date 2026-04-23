@@ -42,6 +42,14 @@ Sem mágica. Sem API. Você é o "fio" que conecta tudo.
 
 ## ETAPA 0 — Confirme que o projeto está configurado
 
+Primeiro, rode um check rapido de setup:
+
+```bash
+./doctor.sh
+```
+
+Se houver `FAIL`, corrija antes de continuar.
+
 O arquivo `context/shared/project.md` já vem preenchido com o TaskFlow. Dê uma olhada:
 
 ```bash
@@ -278,6 +286,16 @@ Em cada etapa:
 2. Copia → cola na IA → recebe a resposta
 3. `./update_memory.sh <pod> "<resumo>"` → salva para o próximo agente ler
 
+Opcional para reforcar padrao de memoria:
+
+```bash
+./update_memory.sh --validate <pod> "<resumo>"
+./update_memory.sh --strict-validate <pod> "<resumo>"
+```
+
+- `--validate`: avisa se o resumo nao tiver bloco `## MEMORY UPDATE` com ao menos 3 bullets.
+- `--strict-validate`: bloqueia salvamento quando o formato minimo nao for atendido.
+
 ---
 
 ## Usando a cadeia pronta (atalho)
@@ -288,6 +306,11 @@ Se preferir ser guiado passo a passo automaticamente, use o runner de cadeia:
 ./run_chain.sh chains/auth.chain
 ```
 
+Notas sobre `chain` files:
+- Sempre coloque a tarefa entre aspas duplas.
+- Em linhas `parallel`, o separador `|` so divide tarefas quando estiver fora de aspas.
+- Se houver erro de sintaxe, o runner agora mostra a linha exata com problema.
+
 Ele vai te dizer exatamente quando rodar cada agente, quando esperar o paralelo e quando avançar — com `ENTER` entre cada etapa.
 
 ---
@@ -297,3 +320,4 @@ Ele vai te dizer exatamente quando rodar cada agente, quando esperar o paralelo 
 - Edite `context/shared/project.md` com o **seu** projeto real
 - Rode `./activate.sh supervisor "Quero construir [sua ideia]"` para receber um plano completo gerado pelo Supervisor
 - Crie sua própria cadeia em `chains/meu-projeto.chain` seguindo os exemplos existentes
+- Para manter consistencia de idioma nas contribuicoes, siga `PADRAO-LINGUAGEM.md`

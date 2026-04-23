@@ -14,12 +14,47 @@
 
 AGENTS_DIR="$(cd "$(dirname "$0")" && pwd)"
 PODS_DIR="$AGENTS_DIR/pods"
+LOCKS_DIR="$AGENTS_DIR/.locks"
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 RED='\033[0;31m'
 NC='\033[0m'
+LOCK_HELD=false
+LOCK_PATH=""
+
+release_lock() {
+    if [ "$LOCK_HELD" = true ] && [ -n "$LOCK_PATH" ] && [ -d "$LOCK_PATH" ]; then
+        rmdir "$LOCK_PATH" 2>/dev/null || true
+        LOCK_HELD=false
+        LOCK_PATH=""
+    fi
+}
+
+acquire_lock() {
+    local lock_name="$1"
+    local attempts="${LOCK_MAX_ATTEMPTS:-100}"
+    local sleep_seconds="${LOCK_SLEEP_SECONDS:-0.1}"
+
+    mkdir -p "$LOCKS_DIR"
+    LOCK_PATH="$LOCKS_DIR/$lock_name.lock"
+
+    while ! mkdir "$LOCK_PATH" 2>/dev/null; do
+        attempts=$((attempts - 1))
+        if [ "$attempts" -le 0 ]; then
+            echo -e "${RED}Erro: timeout ao aguardar lock de escrita para '$lock_name'${NC}"
+            echo "Tente novamente em alguns segundos."
+            return 1
+        fi
+        sleep "$sleep_seconds"
+    done
+
+    LOCK_HELD=true
+    return 0
+}
+
+trap release_lock EXIT INT TERM
 
 KEEP=20
 TARGET_POD=""
@@ -59,6 +94,8 @@ archive_pod() {
         return
     fi
 
+    acquire_lock "$pod-memory" || return
+
     local to_archive=$((task_count - KEEP))
     local archive_file
     if [ "$pod" = "supervisor" ]; then
@@ -73,6 +110,7 @@ archive_pod() {
 
     if [ -z "$first_task_line" ]; then
         echo -e "  ${YELLOW}[$pod]${NC} Nenhuma entrada de tarefa encontrada"
+        release_lock
         return
     fi
 
@@ -122,6 +160,7 @@ archive_pod() {
     rm "$tmp_tasks"
 
     echo -e "  ${GREEN}[$pod]${NC} Arquivadas $to_archive tarefas → $(basename "$archive_file")  (mantidas: $KEEP)"
+    release_lock
 }
 
 echo -e "${CYAN}=== archive_memory.sh — mantendo últimas $KEEP tarefas por pod ===${NC}"

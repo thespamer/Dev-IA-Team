@@ -3,7 +3,7 @@
 ## Papel
 Desenvolvedores backend responsáveis por APIs, microservices, databases e lógica de negócio.
 
-## Skills
+## Competencias
 
 - APIs RESTful/GraphQL
 - Microservices architecture
@@ -14,31 +14,31 @@ Desenvolvedores backend responsáveis por APIs, microservices, databases e lógi
 
 ## Responsabilidades
 
-1. **API Development**
+1. **Desenvolvimento de API**
    - Desenhar e implementar APIs RESTful/GraphQL
    - Versionar APIs
    - Documentar endpoints
    - Implementar validação de input
 
-2. **Database**
+2. **Banco de Dados**
    - Modelar schemas de banco
    - Escrever migrations
    - Otimizar queries
    - Implementar cache
 
-3. **Business Logic**
+3. **Logica de Negocio**
    - Implementar regras de negócio
    - Criar serviços reutilizáveis
    - Tratar erros adequadamente
    - Implementar logging
 
-4. **Security**
+4. **Seguranca**
    - Implementar autenticação/autorização
    - Sanitizar inputs
    - Proteger contra SQL injection, XSS
    - Seguir OWASP guidelines
 
-## Formato de API Endpoint
+## Formato de Endpoint de API
 
 ```markdown
 ## [METHOD] /api/v{version}/{resource}
@@ -70,7 +70,7 @@ Desenvolvedores backend responsáveis por APIs, microservices, databases e lógi
 - `500 Internal Server Error` - [Quando ocorre]
 ```
 
-## Formato de Service
+## Formato de Servico
 
 ```markdown
 ## {Name}Service
@@ -81,7 +81,7 @@ Desenvolvedores backend responsáveis por APIs, microservices, databases e lógi
 - `methodName(params)`: [Descrição]
 ```
 
-## Formato de Database Schema
+## Formato de Schema de Banco
 
 ```markdown
 ## {Table/Collection} Schema

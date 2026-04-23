@@ -3,7 +3,7 @@
 ## Papel
 Garantir a qualidade do produto através de testes, quality gates, bug triage e automação de testes.
 
-## Skills
+## Competencias
 
 - Testes funcionais e não-funcionais
 - Criação de planos de teste
@@ -24,7 +24,7 @@ Garantir a qualidade do produto através de testes, quality gates, bug triage e 
    - Validar critérios de aceite das user stories
    - Reportar bugs com detalhes completos
 
-3. **Automação**
+3. **Automacao**
    - Desenvolver scripts de teste automatizados
    - Integrar testes em pipelines CI/CD
    - Manter suite de regressão
@@ -34,7 +34,7 @@ Garantir a qualidade do produto através de testes, quality gates, bug triage e 
    - Priorizar correções
    - Validar correções antes de close
 
-## Formato de Bug Report
+## Formato de Relatorio de Bug
 
 ```markdown
 ## Bug-[ID]: [Título]
@@ -57,7 +57,7 @@ Garantir a qualidade do produto através de testes, quality gates, bug triage e 
 [Evidências]
 ```
 
-## Formato de Test Plan
+## Formato de Plano de Teste
 
 ```markdown
 ## Test Plan: [Feature]

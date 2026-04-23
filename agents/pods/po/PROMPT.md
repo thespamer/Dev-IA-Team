@@ -3,23 +3,23 @@
 ## Papel
 Gestor de produto responsável pelo roadmap, priorização de features, criação de user stories e gestão de stakeholders.
 
-## Skills
+## Competencias
 
 - Análise de requisitos de negócio
 - Criação de user stories (formato: COMO... PRECISO... PARA...)
 - Priorização MoSCoW (Must, Should, Could, Won't)
 - Comunicação com stakeholders
 - Product Discovery
-- Definção de MVP e roadmap
+- Definição de MVP e roadmap
 
 ## Responsabilidades
 
-1. **Roadmap Management**
+1. **Gestao de Roadmap**
    - Definir visão de produto de curto e longo prazo
    - Planejar releases e milestones
    - Identificar dependências de negócio
 
-2. **User Stories**
+2. **Historias de Usuario**
    - Criar user stories bem formatadas
    - Definir critérios de aceite ( Given-When-Then )
    - Estimar complexidade (story points)
@@ -29,12 +29,12 @@ Gestor de produto responsável pelo roadmap, priorização de features, criaçã
    - Balancear valor de negócio vs esforço técnico
    - Ajustar prioridades baseado em feedback
 
-4. **Stakeholder Management**
-   - Traduzir需求 de stakeholders em funcionalidades
+4. **Gestao de Stakeholders**
+   - Traduzir requisitos de stakeholders em funcionalidades
    - Manter comunicação clara sobre expectativas
    - Gerenciar escopo e expectativas
 
-## Formato de User Story
+## Formato de Historia de Usuario
 
 ```markdown
 ## US-[ID]: [Título]
@@ -51,7 +51,7 @@ Gestor de produto responsável pelo roadmap, priorização de features, criaçã
 ### Prioridade: [MoSCoW]
 ```
 
-## Formato de Roadmap
+## Formato de Roteiro
 
 ```markdown
 ## Roadmap [Período]

@@ -37,6 +37,10 @@ agents/
 ├── update_memory.sh           # Saves AI output back into pod memory
 ├── archive_memory.sh          # Archives old memory entries to keep context lean
 ├── run_chain.sh               # Step-by-step chain runner with ENTER prompts
+├── doctor.sh                  # Validates setup and required project files
+├── tests/
+│   ├── run_smoke_tests.sh     # Smoke tests for scripts and chain parsing
+│   └── fixtures/              # Test chain files (valid/invalid parser cases)
 │
 ├── chains/                    # Ready-to-use chain files
 │   ├── auth.chain             # Authentication system (4 steps)
@@ -59,7 +63,8 @@ agents/
     ├── frontend/
     ├── qa/
     ├── sec/
-    └── devops/
+    ├── devops/
+    └── supervisor/            # Created on first supervisor activation (memory only)
 ```
 
 ---
@@ -92,6 +97,9 @@ No API keys. No server. No dependencies. Just bash + an AI chat.
 git clone https://github.com/thespamer/Dev-IA-Team.git
 cd Dev-IA-Team/agents
 
+# Validate local setup before first run
+./doctor.sh
+
 # Fill in your project details (read by all pods)
 nano context/shared/project.md
 
@@ -118,6 +126,18 @@ The terminal prints everything. Copy it. Paste into your AI chat. Done.
 ---
 
 ## Scripts
+
+### `doctor.sh` — Validate local setup
+
+Runs a health check for required files, executable scripts, pod prompts/memory files, shared context, and chain basics:
+
+```bash
+./doctor.sh
+```
+
+If it finds critical failures, it exits with non-zero status so you can catch issues early.
+
+---
 
 ### `activate.sh` — Activate a pod
 
@@ -184,6 +204,11 @@ Implement GET /api/v1/users with pagination
        ./update_memory.sh backend "<resumo das decisões>"
 ```
 
+Write operations to `memory.md` are lock-protected to avoid race conditions when multiple terminals run in parallel.
+Lock retry behavior can be tuned with env vars for advanced scenarios:
+- `LOCK_MAX_ATTEMPTS` (default: `100`)
+- `LOCK_SLEEP_SECONDS` (default: `0.1`)
+
 ---
 
 ### `update_memory.sh` — Save AI output to memory
@@ -192,6 +217,8 @@ After the AI responds, save the key decisions so the next pod sees them:
 
 ```bash
 ./update_memory.sh <pod> "<summary>"
+./update_memory.sh --validate <pod> "<summary with MEMORY UPDATE block>"
+./update_memory.sh --strict-validate <pod> "<summary with MEMORY UPDATE block>"
 ```
 
 ```bash
@@ -204,6 +231,20 @@ Phase 2 = billing + social login (Should Have). Total: 18 story points no MVP."
 ```
 
 The summary is appended to `memory.md` and will be visible to all future activations of that pod.
+This write path is also lock-protected for safe concurrent usage.
+
+Validation flags:
+- `--validate`: warns if the summary does not include `## MEMORY UPDATE` + at least 3 bullet lines.
+- `--strict-validate`: fails when the summary format does not match that minimum contract.
+
+Example with strict validation:
+
+```bash
+./update_memory.sh --strict-validate backend "## MEMORY UPDATE
+- [Endpoints definidos/implementados: METHOD /path — descricao]
+- [Schemas criados: tabela — campos principais]
+- [Decisoes arquiteturais: choice feita + motivo]"
+```
 
 ---
 
@@ -250,6 +291,12 @@ Guides you through a multi-step chain, one step at a time, pausing for confirmat
 ./run_chain.sh chains/saas-mvp.chain
 ./run_chain.sh my-project.chain        # your own chain
 ```
+
+Parser notes:
+- Tasks must be wrapped in double quotes.
+- `parallel` lines are split only on `|` outside quotes.
+- Literal `|` inside quoted task text is supported.
+- Invalid chain syntax now fails fast with line-specific errors.
 
 What it looks like:
 ```
@@ -301,6 +348,7 @@ When `memory.md` grows too large (old context can exceed LLM limits), archive ol
 ```
 
 Old entries are moved to `memory_archive.md`. The structured header (project info, schemas, etc.) is always preserved.
+Archive writes are lock-protected to prevent conflicts with parallel `activate.sh` / `update_memory.sh` writes.
 
 ---
 
@@ -472,6 +520,31 @@ git clone https://github.com/thespamer/Dev-IA-Team.git
 cd Dev-IA-Team/agents
 nano context/shared/project.md   # fill in your project
 ./activate.sh supervisor "I want to build [your project description]"
+```
+
+---
+
+## Contributing
+
+See `CONTRIBUTING.md` for contribution workflow, script quality checks, and pull request expectations.
+Language consistency rules are documented in `PADRAO-LINGUAGEM.md`.
+
+---
+
+## CI and Tests
+
+- GitHub Actions workflow: `.github/workflows/shell-ci.yml`
+- Checks included:
+  - `shellcheck` linting for all core shell scripts
+  - smoke tests via `agents/tests/run_smoke_tests.sh`
+  - text consistency lint via `agents/tests/lint_text_consistency.sh`
+  - strict `MEMORY UPDATE` validation behavior
+  - lock contention behavior for memory writes
+  - lock-timeout failure behavior
+- Local run:
+
+```bash
+./agents/tests/run_smoke_tests.sh
 ```
 
 ---

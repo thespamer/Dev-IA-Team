@@ -13,6 +13,7 @@ set -e
 AGENTS_DIR="$(cd "$(dirname "$0")" && pwd)"
 PODS_DIR="$AGENTS_DIR/pods"
 SHARED_CONTEXT_DIR="$AGENTS_DIR/context/shared"
+LOCKS_DIR="$AGENTS_DIR/.locks"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -22,6 +23,36 @@ CYAN='\033[0;36m'
 NC='\033[0m'
 
 DRY_RUN=false
+LOCK_HELD=false
+LOCK_PATH=""
+
+release_lock() {
+    if [ "$LOCK_HELD" = true ] && [ -n "$LOCK_PATH" ] && [ -d "$LOCK_PATH" ]; then
+        rmdir "$LOCK_PATH" 2>/dev/null || true
+    fi
+}
+
+acquire_lock() {
+    local lock_name="$1"
+    local attempts="${LOCK_MAX_ATTEMPTS:-100}"
+    local sleep_seconds="${LOCK_SLEEP_SECONDS:-0.1}"
+
+    mkdir -p "$LOCKS_DIR"
+    LOCK_PATH="$LOCKS_DIR/$lock_name.lock"
+
+    while ! mkdir "$LOCK_PATH" 2>/dev/null; do
+        attempts=$((attempts - 1))
+        if [ "$attempts" -le 0 ]; then
+            echo -e "${RED}Erro: timeout ao aguardar lock de escrita para '$lock_name'${NC}"
+            echo "Tente novamente em alguns segundos."
+            exit 1
+        fi
+        sleep "$sleep_seconds"
+    done
+
+    LOCK_HELD=true
+    trap release_lock EXIT INT TERM
+}
 
 # Parse flags
 while [[ "$1" == --* ]]; do
@@ -170,6 +201,7 @@ echo ""
 
 # ── UPDATE MEMORY ─────────────────────────────────────────────
 if [ "$DRY_RUN" = false ]; then
+    acquire_lock "$POD_NAME-memory"
     TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
     {
         echo ""
