@@ -1,0 +1,1304 @@
+{
+  "version": "1.0.0",
+  "project": {
+    "name": "Dev-IA-Team",
+    "languages": ["shell", "markdown", "yaml", "json"],
+    "frameworks": [],
+    "description": "A framework that simulates a complete software engineering team using AI agents — each with a defined role, persistent memory, and structured output — orchestrated by a central Supervisor.",
+    "analyzedAt": "2026-05-02T00:00:00Z",
+    "gitCommitHash": "0b6c2779f28f24212b83687688f35f9d0cb7bfa5"
+  },
+  "nodes": [
+    {
+      "id": "file:agents/activate.sh",
+      "type": "file",
+      "name": "activate.sh",
+      "filePath": "agents/activate.sh",
+      "summary": "Core orchestration script that loads a pod's system prompt, shared context, inter-pod artifacts, and memory, then injects them into a structured prompt. Supports --dry-run mode and file-based locking to prevent concurrent memory writes.",
+      "tags": ["orchestration", "core", "shell", "pod-activation", "locking"],
+      "complexity": "complex",
+      "sizeLines": 220
+    },
+    {
+      "id": "file:agents/run_chain.sh",
+      "type": "file",
+      "name": "run_chain.sh",
+      "filePath": "agents/run_chain.sh",
+      "summary": "Step-by-step chain file runner that parses .chain files, executes sequential and parallel pod steps, and guides the user through each activation with ENTER prompts. Includes a robust quoted-string parser for task arguments.",
+      "tags": ["orchestration", "chain", "shell", "workflow"],
+      "complexity": "complex",
+      "sizeLines": 259
+    },
+    {
+      "id": "file:agents/update_memory.sh",
+      "type": "file",
+      "name": "update_memory.sh",
+      "filePath": "agents/update_memory.sh",
+      "summary": "Appends AI output summaries to a pod's memory.md with a timestamp. Supports --validate and --strict-validate flags to enforce the ## MEMORY UPDATE block format with at least 3 bullet points. Uses file-based locking.",
+      "tags": ["memory", "shell", "validation", "locking"],
+      "complexity": "moderate",
+      "sizeLines": 134
+    },
+    {
+      "id": "file:agents/status.sh",
+      "type": "file",
+      "name": "status.sh",
+      "filePath": "agents/status.sh",
+      "summary": "Displays task history across all pods by reading their memory.md files. Without arguments shows a summary of all pods; with a pod name shows the full memory history.",
+      "tags": ["status", "memory", "shell", "reporting"],
+      "complexity": "moderate",
+      "sizeLines": 129
+    },
+    {
+      "id": "file:agents/archive_memory.sh",
+      "type": "file",
+      "name": "archive_memory.sh",
+      "filePath": "agents/archive_memory.sh",
+      "summary": "Archives old entries from a pod's memory.md to memory_archive.md, keeping the last N tasks (default 20) active. Can run across all pods or a specific one. Uses file-based locking.",
+      "tags": ["memory", "archiving", "shell", "maintenance"],
+      "complexity": "moderate",
+      "sizeLines": 183
+    },
+    {
+      "id": "file:agents/doctor.sh",
+      "type": "file",
+      "name": "doctor.sh",
+      "filePath": "agents/doctor.sh",
+      "summary": "Health-check tool that validates the framework setup: checks all shell scripts are executable, all pod PROMPT.md and memory.md files exist, shared context is populated, chain files have proper headers, and memory files have markdown headers.",
+      "tags": ["validation", "health-check", "shell", "setup"],
+      "complexity": "moderate",
+      "sizeLines": 128
+    },
+    {
+      "id": "file:agents/tests/run_smoke_tests.sh",
+      "type": "file",
+      "name": "run_smoke_tests.sh",
+      "filePath": "agents/tests/run_smoke_tests.sh",
+      "summary": "End-to-end smoke test suite that validates bash syntax for all scripts, runs the doctor check, exercises the chain runner with valid and invalid fixtures, tests memory update validation and strict-validate failure, and verifies lock contention and timeout behavior.",
+      "tags": ["testing", "smoke-tests", "shell", "quality"],
+      "complexity": "moderate",
+      "sizeLines": 78
+    },
+    {
+      "id": "file:agents/tests/lint_text_consistency.sh",
+      "type": "file",
+      "name": "lint_text_consistency.sh",
+      "filePath": "agents/tests/lint_text_consistency.sh",
+      "summary": "Text consistency linter that checks markdown and shell files for language/terminology consistency across the project.",
+      "tags": ["testing", "linting", "shell", "quality"],
+      "complexity": "simple",
+      "sizeLines": 40
+    },
+    {
+      "id": "document:agents/SUPERVISOR.md",
+      "type": "document",
+      "name": "SUPERVISOR.md",
+      "filePath": "agents/SUPERVISOR.md",
+      "summary": "Supervisor role definition — the central orchestrator that receives a user's 'wish', plans execution across all pods, and outputs a detailed step-by-step activation plan with sequential/parallel directives and expected artifacts.",
+      "tags": ["supervisor", "orchestration", "role-definition", "markdown"],
+      "complexity": "complex",
+      "sizeLines": 150
+    },
+    {
+      "id": "document:agents/pods/po/PROMPT.md",
+      "type": "document",
+      "name": "po/PROMPT.md",
+      "filePath": "agents/pods/po/PROMPT.md",
+      "summary": "Product Owner pod role definition. Covers roadmap management, user story creation (COMO/PRECISO/PARA format), MoSCoW prioritization, stakeholder management, and mandates a ## MEMORY UPDATE block in all responses.",
+      "tags": ["pod", "product-owner", "role-definition", "markdown"],
+      "complexity": "moderate",
+      "sizeLines": 93
+    },
+    {
+      "id": "document:agents/pods/backend/PROMPT.md",
+      "type": "document",
+      "name": "backend/PROMPT.md",
+      "filePath": "agents/pods/backend/PROMPT.md",
+      "summary": "Backend pod role definition. Covers RESTful/GraphQL API design, database modeling, business logic, security (OWASP, JWT, bcrypt), and OpenAPI documentation formats.",
+      "tags": ["pod", "backend", "role-definition", "markdown"],
+      "complexity": "moderate",
+      "sizeLines": 127
+    },
+    {
+      "id": "document:agents/pods/frontend/PROMPT.md",
+      "type": "document",
+      "name": "frontend/PROMPT.md",
+      "filePath": "agents/pods/frontend/PROMPT.md",
+      "summary": "Frontend pod role definition. Covers component-based architecture (React/Vue), state management, CSS/Tailwind, WCAG 2.1 accessibility, performance optimization, and responsive design.",
+      "tags": ["pod", "frontend", "role-definition", "markdown"],
+      "complexity": "moderate",
+      "sizeLines": 124
+    },
+    {
+      "id": "document:agents/pods/qa/PROMPT.md",
+      "type": "document",
+      "name": "qa/PROMPT.md",
+      "filePath": "agents/pods/qa/PROMPT.md",
+      "summary": "Quality Assurance pod role definition. Covers test planning, unit/integration/E2E test automation, bug triage, coverage analysis, and quality gates for CI/CD pipelines.",
+      "tags": ["pod", "qa", "role-definition", "markdown"],
+      "complexity": "moderate",
+      "sizeLines": 108
+    },
+    {
+      "id": "document:agents/pods/sec/PROMPT.md",
+      "type": "document",
+      "name": "sec/PROMPT.md",
+      "filePath": "agents/pods/sec/PROMPT.md",
+      "summary": "Security pod role definition. Covers OWASP Top 10 reviews, OAuth2/JWT/SAML authentication, penetration testing, vulnerability assessment, and compliance (GDPR, LGPD).",
+      "tags": ["pod", "security", "role-definition", "markdown"],
+      "complexity": "moderate",
+      "sizeLines": 128
+    },
+    {
+      "id": "document:agents/pods/devops/PROMPT.md",
+      "type": "document",
+      "name": "devops/PROMPT.md",
+      "filePath": "agents/pods/devops/PROMPT.md",
+      "summary": "DevOps pod role definition. Covers CI/CD pipelines (GitHub Actions), Docker/Kubernetes, Terraform IaC, Prometheus/Grafana monitoring, and cloud platforms (AWS, GCP, Azure).",
+      "tags": ["pod", "devops", "role-definition", "markdown"],
+      "complexity": "moderate",
+      "sizeLines": 136
+    },
+    {
+      "id": "document:agents/pods/supervisor/PROMPT.md",
+      "type": "document",
+      "name": "supervisor/PROMPT.md",
+      "filePath": "agents/pods/supervisor/PROMPT.md",
+      "summary": "Supervisor pod prompt file (mirrors SUPERVISOR.md content). Defines the orchestrator role, available tools, sequential/parallel orchestration directives, and required response format.",
+      "tags": ["pod", "supervisor", "role-definition", "markdown"],
+      "complexity": "moderate",
+      "sizeLines": 150
+    },
+    {
+      "id": "document:agents/pods/po/memory.md",
+      "type": "document",
+      "name": "po/memory.md",
+      "filePath": "agents/pods/po/memory.md",
+      "summary": "Persistent memory for the Product Owner pod — records task history, prioritization decisions, and AI output summaries across sessions.",
+      "tags": ["memory", "product-owner", "persistence", "markdown"],
+      "complexity": "simple",
+      "sizeLines": 39
+    },
+    {
+      "id": "document:agents/pods/backend/memory.md",
+      "type": "document",
+      "name": "backend/memory.md",
+      "filePath": "agents/pods/backend/memory.md",
+      "summary": "Persistent memory for the Backend pod — records API design decisions, database schemas, and implementation summaries.",
+      "tags": ["memory", "backend", "persistence", "markdown"],
+      "complexity": "simple",
+      "sizeLines": 56
+    },
+    {
+      "id": "document:agents/pods/frontend/memory.md",
+      "type": "document",
+      "name": "frontend/memory.md",
+      "filePath": "agents/pods/frontend/memory.md",
+      "summary": "Persistent memory for the Frontend pod — records component decisions, UI/UX choices, and implementation notes.",
+      "tags": ["memory", "frontend", "persistence", "markdown"],
+      "complexity": "simple",
+      "sizeLines": 53
+    },
+    {
+      "id": "document:agents/pods/qa/memory.md",
+      "type": "document",
+      "name": "qa/memory.md",
+      "filePath": "agents/pods/qa/memory.md",
+      "summary": "Persistent memory for the QA pod — records test plans, coverage results, and quality gate decisions.",
+      "tags": ["memory", "qa", "persistence", "markdown"],
+      "complexity": "simple",
+      "sizeLines": 42
+    },
+    {
+      "id": "document:agents/pods/sec/memory.md",
+      "type": "document",
+      "name": "sec/memory.md",
+      "filePath": "agents/pods/sec/memory.md",
+      "summary": "Persistent memory for the Security pod — records vulnerability findings, security decisions, and review outcomes.",
+      "tags": ["memory", "security", "persistence", "markdown"],
+      "complexity": "simple",
+      "sizeLines": 61
+    },
+    {
+      "id": "document:agents/pods/devops/memory.md",
+      "type": "document",
+      "name": "devops/memory.md",
+      "filePath": "agents/pods/devops/memory.md",
+      "summary": "Persistent memory for the DevOps pod — records infrastructure decisions, pipeline configurations, and deployment notes.",
+      "tags": ["memory", "devops", "persistence", "markdown"],
+      "complexity": "simple",
+      "sizeLines": 74
+    },
+    {
+      "id": "document:agents/pods/supervisor/memory.md",
+      "type": "document",
+      "name": "supervisor/memory.md",
+      "filePath": "agents/pods/supervisor/memory.md",
+      "summary": "Persistent memory for the Supervisor — records orchestration plans, pod dependencies, and execution history.",
+      "tags": ["memory", "supervisor", "persistence", "markdown"],
+      "complexity": "simple",
+      "sizeLines": 19
+    },
+    {
+      "id": "document:agents/context/shared/project.md",
+      "type": "document",
+      "name": "project.md",
+      "filePath": "agents/context/shared/project.md",
+      "summary": "Shared project context file read by ALL pods on every activation. Defines the current project (TaskFlow — kanban task management platform), tech stack (Node.js, React, PostgreSQL, Redis, AWS), architectural decisions (JWT RS256, UUIDv4, soft delete), coding standards, and environment URLs.",
+      "tags": ["shared-context", "project-config", "all-pods", "markdown"],
+      "complexity": "simple",
+      "sizeLines": 48
+    },
+    {
+      "id": "config:agents/chains/auth.chain",
+      "type": "config",
+      "name": "auth.chain",
+      "filePath": "agents/chains/auth.chain",
+      "summary": "4-step chain workflow for building a complete authentication system: PO defines stories, Backend+Frontend run in parallel, QA+Security review in parallel, DevOps configures CI/CD deployment.",
+      "tags": ["chain", "workflow", "authentication", "template"],
+      "complexity": "simple",
+      "sizeLines": 13
+    },
+    {
+      "id": "config:agents/chains/ecommerce.chain",
+      "type": "config",
+      "name": "ecommerce.chain",
+      "filePath": "agents/chains/ecommerce.chain",
+      "summary": "5-step chain workflow for building an e-commerce system with Stripe payments integration.",
+      "tags": ["chain", "workflow", "ecommerce", "template"],
+      "complexity": "simple",
+      "sizeLines": 16
+    },
+    {
+      "id": "config:agents/chains/saas-mvp.chain",
+      "type": "config",
+      "name": "saas-mvp.chain",
+      "filePath": "agents/chains/saas-mvp.chain",
+      "summary": "5-step chain workflow for building a SaaS MVP with billing and team management features.",
+      "tags": ["chain", "workflow", "saas", "template"],
+      "complexity": "simple",
+      "sizeLines": 16
+    },
+    {
+      "id": "config:agents/chains/framework-improvements.chain",
+      "type": "config",
+      "name": "framework-improvements.chain",
+      "filePath": "agents/chains/framework-improvements.chain",
+      "summary": "Chain workflow for proposing and implementing improvements to the Dev-IA-Team framework itself.",
+      "tags": ["chain", "workflow", "meta", "improvements"],
+      "complexity": "simple",
+      "sizeLines": 13
+    },
+    {
+      "id": "config:agents/tests/fixtures/parser-valid.chain",
+      "type": "config",
+      "name": "parser-valid.chain",
+      "filePath": "agents/tests/fixtures/parser-valid.chain",
+      "summary": "Test fixture: a valid .chain file used by run_smoke_tests.sh to verify the chain parser accepts correct syntax.",
+      "tags": ["test-fixture", "chain", "parser"],
+      "complexity": "simple",
+      "sizeLines": 5
+    },
+    {
+      "id": "config:agents/tests/fixtures/parser-invalid.chain",
+      "type": "config",
+      "name": "parser-invalid.chain",
+      "filePath": "agents/tests/fixtures/parser-invalid.chain",
+      "summary": "Test fixture: a malformed .chain file (unclosed quotes or bad syntax) that must cause the chain parser to fail.",
+      "tags": ["test-fixture", "chain", "parser", "negative-test"],
+      "complexity": "simple",
+      "sizeLines": 3
+    },
+    {
+      "id": "config:agents/tests/fixtures/parser-invalid-command.chain",
+      "type": "config",
+      "name": "parser-invalid-command.chain",
+      "filePath": "agents/tests/fixtures/parser-invalid-command.chain",
+      "summary": "Test fixture: a .chain file with an unknown command keyword that must cause the chain parser to fail.",
+      "tags": ["test-fixture", "chain", "parser", "negative-test"],
+      "complexity": "simple",
+      "sizeLines": 3
+    },
+    {
+      "id": "pipeline:.github/workflows/shell-ci.yml",
+      "type": "pipeline",
+      "name": "shell-ci.yml",
+      "filePath": ".github/workflows/shell-ci.yml",
+      "summary": "GitHub Actions CI pipeline that runs on push/PR to main. Installs shellcheck, lints all shell scripts (activate.sh, update_memory.sh, status.sh, run_chain.sh, archive_memory.sh, doctor.sh, and test scripts), then runs the full smoke test suite.",
+      "tags": ["ci-cd", "github-actions", "shellcheck", "quality-gate"],
+      "complexity": "simple",
+      "sizeLines": 32
+    },
+    {
+      "id": "config:.claude/settings.local.json",
+      "type": "config",
+      "name": "settings.local.json",
+      "filePath": ".claude/settings.local.json",
+      "summary": "Claude Code local settings file for this project, configuring permissions and behaviors for the Claude Code CLI.",
+      "tags": ["claude-code", "configuration", "local"],
+      "complexity": "simple",
+      "sizeLines": 9
+    },
+    {
+      "id": "config:.gitignore",
+      "type": "config",
+      "name": ".gitignore",
+      "filePath": ".gitignore",
+      "summary": "Git ignore rules for the repository.",
+      "tags": ["git", "configuration"],
+      "complexity": "simple",
+      "sizeLines": 1
+    },
+    {
+      "id": "document:README.md",
+      "type": "document",
+      "name": "README.md",
+      "filePath": "README.md",
+      "summary": "Primary project documentation. Explains the framework's purpose as a context orchestrator (not a code executor), the pod/chain/memory structure, quick-start guide, available pods (PO, Backend, Frontend, QA, Sec, DevOps, Supervisor), and how to activate them.",
+      "tags": ["documentation", "overview", "getting-started", "markdown"],
+      "complexity": "moderate",
+      "sizeLines": 554
+    },
+    {
+      "id": "document:CONTRIBUTING.md",
+      "type": "document",
+      "name": "CONTRIBUTING.md",
+      "filePath": "CONTRIBUTING.md",
+      "summary": "Contributor guidelines covering code standards, shell scripting conventions, testing requirements, and pull request process for the Dev-IA-Team framework.",
+      "tags": ["documentation", "contributing", "guidelines", "markdown"],
+      "complexity": "simple",
+      "sizeLines": 50
+    },
+    {
+      "id": "document:ARTICLE.md",
+      "type": "document",
+      "name": "ARTICLE.md",
+      "filePath": "ARTICLE.md",
+      "summary": "Article explaining the concepts and motivation behind the Dev-IA-Team framework — AI agent team simulation, context coherence, and the human-as-bridge execution model.",
+      "tags": ["documentation", "article", "concepts", "markdown"],
+      "complexity": "moderate",
+      "sizeLines": 161
+    },
+    {
+      "id": "document:PASSO-A-PASSO.md",
+      "type": "document",
+      "name": "PASSO-A-PASSO.md",
+      "filePath": "PASSO-A-PASSO.md",
+      "summary": "Didactic step-by-step guide walking through a complete TaskFlow scenario — from Supervisor planning through PO, Backend, QA, and DevOps pod activation — demonstrating the full framework workflow.",
+      "tags": ["documentation", "tutorial", "step-by-step", "markdown"],
+      "complexity": "moderate",
+      "sizeLines": 323
+    },
+    {
+      "id": "document:PLANO-MELHORIAS.md",
+      "type": "document",
+      "name": "PLANO-MELHORIAS.md",
+      "filePath": "PLANO-MELHORIAS.md",
+      "summary": "Improvement plan listing proposed enhancements to the framework, including new features, refactoring ideas, and quality improvements.",
+      "tags": ["documentation", "roadmap", "improvements", "markdown"],
+      "complexity": "moderate",
+      "sizeLines": 144
+    },
+    {
+      "id": "document:STATUS-ATUAL.md",
+      "type": "document",
+      "name": "STATUS-ATUAL.md",
+      "filePath": "STATUS-ATUAL.md",
+      "summary": "Current project status document tracking the framework's development state, completed features, and pending work.",
+      "tags": ["documentation", "status", "tracking", "markdown"],
+      "complexity": "simple",
+      "sizeLines": 60
+    },
+    {
+      "id": "document:PADRAO-LINGUAGEM.md",
+      "type": "document",
+      "name": "PADRAO-LINGUAGEM.md",
+      "filePath": "PADRAO-LINGUAGEM.md",
+      "summary": "Language standard guide defining terminology and naming conventions used consistently across the framework documentation and code.",
+      "tags": ["documentation", "standards", "language", "markdown"],
+      "complexity": "simple",
+      "sizeLines": 19
+    },
+    {
+      "id": "document:LICENSE",
+      "type": "document",
+      "name": "LICENSE",
+      "filePath": "LICENSE",
+      "summary": "Project open-source license file.",
+      "tags": ["license", "legal"],
+      "complexity": "simple",
+      "sizeLines": 21
+    }
+  ],
+  "edges": [
+    {
+      "source": "file:agents/activate.sh",
+      "target": "document:agents/SUPERVISOR.md",
+      "type": "reads_from",
+      "weight": 0.7,
+      "label": "loads SUPERVISOR.md as PROMPT_FILE when pod=supervisor"
+    },
+    {
+      "source": "file:agents/activate.sh",
+      "target": "document:agents/pods/po/PROMPT.md",
+      "type": "reads_from",
+      "weight": 0.7,
+      "label": "loads pod PROMPT.md into system prompt"
+    },
+    {
+      "source": "file:agents/activate.sh",
+      "target": "document:agents/pods/backend/PROMPT.md",
+      "type": "reads_from",
+      "weight": 0.7
+    },
+    {
+      "source": "file:agents/activate.sh",
+      "target": "document:agents/pods/frontend/PROMPT.md",
+      "type": "reads_from",
+      "weight": 0.7
+    },
+    {
+      "source": "file:agents/activate.sh",
+      "target": "document:agents/pods/qa/PROMPT.md",
+      "type": "reads_from",
+      "weight": 0.7
+    },
+    {
+      "source": "file:agents/activate.sh",
+      "target": "document:agents/pods/sec/PROMPT.md",
+      "type": "reads_from",
+      "weight": 0.7
+    },
+    {
+      "source": "file:agents/activate.sh",
+      "target": "document:agents/pods/devops/PROMPT.md",
+      "type": "reads_from",
+      "weight": 0.7
+    },
+    {
+      "source": "file:agents/activate.sh",
+      "target": "document:agents/pods/supervisor/PROMPT.md",
+      "type": "reads_from",
+      "weight": 0.7
+    },
+    {
+      "source": "file:agents/activate.sh",
+      "target": "document:agents/pods/po/memory.md",
+      "type": "reads_from",
+      "weight": 0.7,
+      "label": "reads memory.md into prompt and appends new task entry"
+    },
+    {
+      "source": "file:agents/activate.sh",
+      "target": "document:agents/pods/backend/memory.md",
+      "type": "reads_from",
+      "weight": 0.7
+    },
+    {
+      "source": "file:agents/activate.sh",
+      "target": "document:agents/pods/frontend/memory.md",
+      "type": "reads_from",
+      "weight": 0.7
+    },
+    {
+      "source": "file:agents/activate.sh",
+      "target": "document:agents/pods/qa/memory.md",
+      "type": "reads_from",
+      "weight": 0.7
+    },
+    {
+      "source": "file:agents/activate.sh",
+      "target": "document:agents/pods/sec/memory.md",
+      "type": "reads_from",
+      "weight": 0.7
+    },
+    {
+      "source": "file:agents/activate.sh",
+      "target": "document:agents/pods/devops/memory.md",
+      "type": "reads_from",
+      "weight": 0.7
+    },
+    {
+      "source": "file:agents/activate.sh",
+      "target": "document:agents/pods/supervisor/memory.md",
+      "type": "reads_from",
+      "weight": 0.7
+    },
+    {
+      "source": "file:agents/activate.sh",
+      "target": "document:agents/context/shared/project.md",
+      "type": "reads_from",
+      "weight": 0.7,
+      "label": "loads shared project context into every pod activation"
+    },
+    {
+      "source": "file:agents/activate.sh",
+      "target": "document:agents/pods/po/memory.md",
+      "type": "writes_to",
+      "weight": 0.7,
+      "label": "appends task entry to memory.md (unless --dry-run)"
+    },
+    {
+      "source": "file:agents/activate.sh",
+      "target": "document:agents/pods/backend/memory.md",
+      "type": "writes_to",
+      "weight": 0.7
+    },
+    {
+      "source": "file:agents/activate.sh",
+      "target": "document:agents/pods/frontend/memory.md",
+      "type": "writes_to",
+      "weight": 0.7
+    },
+    {
+      "source": "file:agents/activate.sh",
+      "target": "document:agents/pods/qa/memory.md",
+      "type": "writes_to",
+      "weight": 0.7
+    },
+    {
+      "source": "file:agents/activate.sh",
+      "target": "document:agents/pods/sec/memory.md",
+      "type": "writes_to",
+      "weight": 0.7
+    },
+    {
+      "source": "file:agents/activate.sh",
+      "target": "document:agents/pods/devops/memory.md",
+      "type": "writes_to",
+      "weight": 0.7
+    },
+    {
+      "source": "file:agents/activate.sh",
+      "target": "document:agents/pods/supervisor/memory.md",
+      "type": "writes_to",
+      "weight": 0.7
+    },
+    {
+      "source": "file:agents/run_chain.sh",
+      "target": "file:agents/activate.sh",
+      "type": "calls",
+      "weight": 0.8,
+      "label": "invokes activate.sh for each chain step"
+    },
+    {
+      "source": "file:agents/run_chain.sh",
+      "target": "config:agents/chains/auth.chain",
+      "type": "reads_from",
+      "weight": 0.7
+    },
+    {
+      "source": "file:agents/run_chain.sh",
+      "target": "config:agents/chains/ecommerce.chain",
+      "type": "reads_from",
+      "weight": 0.7
+    },
+    {
+      "source": "file:agents/run_chain.sh",
+      "target": "config:agents/chains/saas-mvp.chain",
+      "type": "reads_from",
+      "weight": 0.7
+    },
+    {
+      "source": "file:agents/run_chain.sh",
+      "target": "config:agents/chains/framework-improvements.chain",
+      "type": "reads_from",
+      "weight": 0.7
+    },
+    {
+      "source": "file:agents/update_memory.sh",
+      "target": "document:agents/pods/po/memory.md",
+      "type": "writes_to",
+      "weight": 0.7,
+      "label": "appends AI output summary to memory.md"
+    },
+    {
+      "source": "file:agents/update_memory.sh",
+      "target": "document:agents/pods/backend/memory.md",
+      "type": "writes_to",
+      "weight": 0.7
+    },
+    {
+      "source": "file:agents/update_memory.sh",
+      "target": "document:agents/pods/frontend/memory.md",
+      "type": "writes_to",
+      "weight": 0.7
+    },
+    {
+      "source": "file:agents/update_memory.sh",
+      "target": "document:agents/pods/qa/memory.md",
+      "type": "writes_to",
+      "weight": 0.7
+    },
+    {
+      "source": "file:agents/update_memory.sh",
+      "target": "document:agents/pods/sec/memory.md",
+      "type": "writes_to",
+      "weight": 0.7
+    },
+    {
+      "source": "file:agents/update_memory.sh",
+      "target": "document:agents/pods/devops/memory.md",
+      "type": "writes_to",
+      "weight": 0.7
+    },
+    {
+      "source": "file:agents/update_memory.sh",
+      "target": "document:agents/pods/supervisor/memory.md",
+      "type": "writes_to",
+      "weight": 0.7
+    },
+    {
+      "source": "file:agents/status.sh",
+      "target": "document:agents/pods/po/memory.md",
+      "type": "reads_from",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/status.sh",
+      "target": "document:agents/pods/backend/memory.md",
+      "type": "reads_from",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/status.sh",
+      "target": "document:agents/pods/frontend/memory.md",
+      "type": "reads_from",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/status.sh",
+      "target": "document:agents/pods/qa/memory.md",
+      "type": "reads_from",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/status.sh",
+      "target": "document:agents/pods/sec/memory.md",
+      "type": "reads_from",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/status.sh",
+      "target": "document:agents/pods/devops/memory.md",
+      "type": "reads_from",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/status.sh",
+      "target": "document:agents/pods/supervisor/memory.md",
+      "type": "reads_from",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/archive_memory.sh",
+      "target": "document:agents/pods/po/memory.md",
+      "type": "transforms",
+      "weight": 0.5,
+      "label": "archives old entries, keeps last N tasks"
+    },
+    {
+      "source": "file:agents/archive_memory.sh",
+      "target": "document:agents/pods/backend/memory.md",
+      "type": "transforms",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/archive_memory.sh",
+      "target": "document:agents/pods/frontend/memory.md",
+      "type": "transforms",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/archive_memory.sh",
+      "target": "document:agents/pods/qa/memory.md",
+      "type": "transforms",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/archive_memory.sh",
+      "target": "document:agents/pods/sec/memory.md",
+      "type": "transforms",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/archive_memory.sh",
+      "target": "document:agents/pods/devops/memory.md",
+      "type": "transforms",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/archive_memory.sh",
+      "target": "document:agents/pods/supervisor/memory.md",
+      "type": "transforms",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/doctor.sh",
+      "target": "file:agents/activate.sh",
+      "type": "validates",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/doctor.sh",
+      "target": "file:agents/update_memory.sh",
+      "type": "validates",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/doctor.sh",
+      "target": "file:agents/status.sh",
+      "type": "validates",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/doctor.sh",
+      "target": "file:agents/run_chain.sh",
+      "type": "validates",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/doctor.sh",
+      "target": "file:agents/archive_memory.sh",
+      "type": "validates",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/doctor.sh",
+      "target": "document:agents/pods/po/PROMPT.md",
+      "type": "validates",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/doctor.sh",
+      "target": "document:agents/pods/backend/PROMPT.md",
+      "type": "validates",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/doctor.sh",
+      "target": "document:agents/pods/frontend/PROMPT.md",
+      "type": "validates",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/doctor.sh",
+      "target": "document:agents/pods/qa/PROMPT.md",
+      "type": "validates",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/doctor.sh",
+      "target": "document:agents/pods/sec/PROMPT.md",
+      "type": "validates",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/doctor.sh",
+      "target": "document:agents/pods/devops/PROMPT.md",
+      "type": "validates",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/doctor.sh",
+      "target": "document:agents/pods/po/memory.md",
+      "type": "validates",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/doctor.sh",
+      "target": "document:agents/pods/backend/memory.md",
+      "type": "validates",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/doctor.sh",
+      "target": "document:agents/pods/frontend/memory.md",
+      "type": "validates",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/doctor.sh",
+      "target": "document:agents/pods/qa/memory.md",
+      "type": "validates",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/doctor.sh",
+      "target": "document:agents/pods/sec/memory.md",
+      "type": "validates",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/doctor.sh",
+      "target": "document:agents/pods/devops/memory.md",
+      "type": "validates",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/doctor.sh",
+      "target": "document:agents/context/shared/project.md",
+      "type": "validates",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/doctor.sh",
+      "target": "config:agents/chains/auth.chain",
+      "type": "validates",
+      "weight": 0.5
+    },
+    {
+      "source": "pipeline:.github/workflows/shell-ci.yml",
+      "target": "file:agents/activate.sh",
+      "type": "triggers",
+      "weight": 0.6,
+      "label": "shellcheck lint on CI"
+    },
+    {
+      "source": "pipeline:.github/workflows/shell-ci.yml",
+      "target": "file:agents/update_memory.sh",
+      "type": "triggers",
+      "weight": 0.6
+    },
+    {
+      "source": "pipeline:.github/workflows/shell-ci.yml",
+      "target": "file:agents/status.sh",
+      "type": "triggers",
+      "weight": 0.6
+    },
+    {
+      "source": "pipeline:.github/workflows/shell-ci.yml",
+      "target": "file:agents/run_chain.sh",
+      "type": "triggers",
+      "weight": 0.6
+    },
+    {
+      "source": "pipeline:.github/workflows/shell-ci.yml",
+      "target": "file:agents/archive_memory.sh",
+      "type": "triggers",
+      "weight": 0.6
+    },
+    {
+      "source": "pipeline:.github/workflows/shell-ci.yml",
+      "target": "file:agents/doctor.sh",
+      "type": "triggers",
+      "weight": 0.6
+    },
+    {
+      "source": "pipeline:.github/workflows/shell-ci.yml",
+      "target": "file:agents/tests/run_smoke_tests.sh",
+      "type": "triggers",
+      "weight": 0.6,
+      "label": "runs smoke test suite"
+    },
+    {
+      "source": "pipeline:.github/workflows/shell-ci.yml",
+      "target": "file:agents/tests/lint_text_consistency.sh",
+      "type": "triggers",
+      "weight": 0.6
+    },
+    {
+      "source": "file:agents/tests/run_smoke_tests.sh",
+      "target": "file:agents/activate.sh",
+      "type": "tested_by",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/tests/run_smoke_tests.sh",
+      "target": "file:agents/update_memory.sh",
+      "type": "tested_by",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/tests/run_smoke_tests.sh",
+      "target": "file:agents/run_chain.sh",
+      "type": "tested_by",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/tests/run_smoke_tests.sh",
+      "target": "file:agents/doctor.sh",
+      "type": "tested_by",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/tests/run_smoke_tests.sh",
+      "target": "file:agents/archive_memory.sh",
+      "type": "tested_by",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/tests/run_smoke_tests.sh",
+      "target": "config:agents/tests/fixtures/parser-valid.chain",
+      "type": "reads_from",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/tests/run_smoke_tests.sh",
+      "target": "config:agents/tests/fixtures/parser-invalid.chain",
+      "type": "reads_from",
+      "weight": 0.5
+    },
+    {
+      "source": "file:agents/tests/run_smoke_tests.sh",
+      "target": "config:agents/tests/fixtures/parser-invalid-command.chain",
+      "type": "reads_from",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "file:agents/activate.sh",
+      "type": "documents",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "file:agents/run_chain.sh",
+      "type": "documents",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "file:agents/update_memory.sh",
+      "type": "documents",
+      "weight": 0.5
+    },
+    {
+      "source": "document:README.md",
+      "target": "document:agents/SUPERVISOR.md",
+      "type": "documents",
+      "weight": 0.5
+    },
+    {
+      "source": "document:PASSO-A-PASSO.md",
+      "target": "file:agents/activate.sh",
+      "type": "documents",
+      "weight": 0.5
+    },
+    {
+      "source": "document:PASSO-A-PASSO.md",
+      "target": "document:agents/context/shared/project.md",
+      "type": "documents",
+      "weight": 0.5
+    },
+    {
+      "source": "document:CONTRIBUTING.md",
+      "target": "file:agents/activate.sh",
+      "type": "documents",
+      "weight": 0.5
+    },
+    {
+      "source": "document:CONTRIBUTING.md",
+      "target": "file:agents/tests/run_smoke_tests.sh",
+      "type": "documents",
+      "weight": 0.5
+    },
+    {
+      "source": "document:ARTICLE.md",
+      "target": "document:README.md",
+      "type": "related",
+      "weight": 0.5
+    },
+    {
+      "source": "document:PLANO-MELHORIAS.md",
+      "target": "document:STATUS-ATUAL.md",
+      "type": "related",
+      "weight": 0.5
+    },
+    {
+      "source": "document:PADRAO-LINGUAGEM.md",
+      "target": "document:CONTRIBUTING.md",
+      "type": "related",
+      "weight": 0.5
+    },
+    {
+      "source": "document:agents/context/shared/project.md",
+      "target": "document:agents/pods/po/PROMPT.md",
+      "type": "configures",
+      "weight": 0.6,
+      "label": "loaded into every pod via activate.sh as shared context"
+    },
+    {
+      "source": "document:agents/context/shared/project.md",
+      "target": "document:agents/pods/backend/PROMPT.md",
+      "type": "configures",
+      "weight": 0.6
+    },
+    {
+      "source": "document:agents/context/shared/project.md",
+      "target": "document:agents/pods/frontend/PROMPT.md",
+      "type": "configures",
+      "weight": 0.6
+    },
+    {
+      "source": "document:agents/context/shared/project.md",
+      "target": "document:agents/pods/qa/PROMPT.md",
+      "type": "configures",
+      "weight": 0.6
+    },
+    {
+      "source": "document:agents/context/shared/project.md",
+      "target": "document:agents/pods/sec/PROMPT.md",
+      "type": "configures",
+      "weight": 0.6
+    },
+    {
+      "source": "document:agents/context/shared/project.md",
+      "target": "document:agents/pods/devops/PROMPT.md",
+      "type": "configures",
+      "weight": 0.6
+    },
+    {
+      "source": "document:agents/SUPERVISOR.md",
+      "target": "document:agents/pods/po/PROMPT.md",
+      "type": "related",
+      "weight": 0.5,
+      "label": "supervisor orchestrates all pods"
+    },
+    {
+      "source": "document:agents/SUPERVISOR.md",
+      "target": "document:agents/pods/backend/PROMPT.md",
+      "type": "related",
+      "weight": 0.5
+    },
+    {
+      "source": "document:agents/SUPERVISOR.md",
+      "target": "document:agents/pods/frontend/PROMPT.md",
+      "type": "related",
+      "weight": 0.5
+    },
+    {
+      "source": "document:agents/SUPERVISOR.md",
+      "target": "document:agents/pods/qa/PROMPT.md",
+      "type": "related",
+      "weight": 0.5
+    },
+    {
+      "source": "document:agents/SUPERVISOR.md",
+      "target": "document:agents/pods/sec/PROMPT.md",
+      "type": "related",
+      "weight": 0.5
+    },
+    {
+      "source": "document:agents/SUPERVISOR.md",
+      "target": "document:agents/pods/devops/PROMPT.md",
+      "type": "related",
+      "weight": 0.5
+    },
+    {
+      "source": "document:agents/pods/supervisor/PROMPT.md",
+      "target": "document:agents/SUPERVISOR.md",
+      "type": "similar_to",
+      "weight": 0.5,
+      "label": "pod variant of the Supervisor role definition"
+    },
+    {
+      "source": "config:agents/chains/auth.chain",
+      "target": "document:agents/pods/po/PROMPT.md",
+      "type": "depends_on",
+      "weight": 0.6,
+      "label": "chain step activates po pod"
+    },
+    {
+      "source": "config:agents/chains/auth.chain",
+      "target": "document:agents/pods/backend/PROMPT.md",
+      "type": "depends_on",
+      "weight": 0.6
+    },
+    {
+      "source": "config:agents/chains/auth.chain",
+      "target": "document:agents/pods/frontend/PROMPT.md",
+      "type": "depends_on",
+      "weight": 0.6
+    },
+    {
+      "source": "config:agents/chains/auth.chain",
+      "target": "document:agents/pods/qa/PROMPT.md",
+      "type": "depends_on",
+      "weight": 0.6
+    },
+    {
+      "source": "config:agents/chains/auth.chain",
+      "target": "document:agents/pods/sec/PROMPT.md",
+      "type": "depends_on",
+      "weight": 0.6
+    },
+    {
+      "source": "config:agents/chains/auth.chain",
+      "target": "document:agents/pods/devops/PROMPT.md",
+      "type": "depends_on",
+      "weight": 0.6
+    }
+  ],
+  "layers": [
+    {
+      "id": "layer:core-orchestration",
+      "name": "Core Orchestration",
+      "description": "The central scripts and role definitions that drive the framework — pod activation, chain execution, and the Supervisor orchestrator.",
+      "nodeIds": [
+        "file:agents/activate.sh",
+        "file:agents/run_chain.sh",
+        "document:agents/SUPERVISOR.md",
+        "document:agents/pods/supervisor/PROMPT.md"
+      ]
+    },
+    {
+      "id": "layer:pod-definitions",
+      "name": "Pod Role Definitions",
+      "description": "Prompt files that define the role, competencies, responsibilities, and output formats for each specialist pod.",
+      "nodeIds": [
+        "document:agents/pods/po/PROMPT.md",
+        "document:agents/pods/backend/PROMPT.md",
+        "document:agents/pods/frontend/PROMPT.md",
+        "document:agents/pods/qa/PROMPT.md",
+        "document:agents/pods/sec/PROMPT.md",
+        "document:agents/pods/devops/PROMPT.md"
+      ]
+    },
+    {
+      "id": "layer:memory-and-state",
+      "name": "Memory & State Management",
+      "description": "Scripts and files responsible for reading, writing, archiving, and displaying pod memory across sessions.",
+      "nodeIds": [
+        "file:agents/update_memory.sh",
+        "file:agents/archive_memory.sh",
+        "file:agents/status.sh",
+        "document:agents/pods/po/memory.md",
+        "document:agents/pods/backend/memory.md",
+        "document:agents/pods/frontend/memory.md",
+        "document:agents/pods/qa/memory.md",
+        "document:agents/pods/sec/memory.md",
+        "document:agents/pods/devops/memory.md",
+        "document:agents/pods/supervisor/memory.md",
+        "document:agents/context/shared/project.md"
+      ]
+    },
+    {
+      "id": "layer:chain-workflows",
+      "name": "Chain Workflows",
+      "description": "Pre-built workflow templates that define multi-pod execution sequences for common project types.",
+      "nodeIds": [
+        "config:agents/chains/auth.chain",
+        "config:agents/chains/ecommerce.chain",
+        "config:agents/chains/saas-mvp.chain",
+        "config:agents/chains/framework-improvements.chain"
+      ]
+    },
+    {
+      "id": "layer:quality-and-ci",
+      "name": "Quality & CI",
+      "description": "Testing infrastructure, health-check tools, and CI/CD pipeline that enforce correctness of the framework scripts.",
+      "nodeIds": [
+        "file:agents/doctor.sh",
+        "file:agents/tests/run_smoke_tests.sh",
+        "file:agents/tests/lint_text_consistency.sh",
+        "config:agents/tests/fixtures/parser-valid.chain",
+        "config:agents/tests/fixtures/parser-invalid.chain",
+        "config:agents/tests/fixtures/parser-invalid-command.chain",
+        "pipeline:.github/workflows/shell-ci.yml"
+      ]
+    },
+    {
+      "id": "layer:project-documentation",
+      "name": "Project Documentation",
+      "description": "Documentation explaining the framework's purpose, usage, contribution guidelines, and improvement roadmap.",
+      "nodeIds": [
+        "document:README.md",
+        "document:CONTRIBUTING.md",
+        "document:ARTICLE.md",
+        "document:PASSO-A-PASSO.md",
+        "document:PLANO-MELHORIAS.md",
+        "document:STATUS-ATUAL.md",
+        "document:PADRAO-LINGUAGEM.md",
+        "document:LICENSE"
+      ]
+    },
+    {
+      "id": "layer:configuration",
+      "name": "Configuration",
+      "description": "Repository and tooling configuration files.",
+      "nodeIds": [
+        "config:.claude/settings.local.json",
+        "config:.gitignore"
+      ]
+    }
+  ],
+  "tour": [
+    {
+      "order": 1,
+      "title": "Project Overview",
+      "description": "Start with the README to understand what Dev-IA-Team is — a context orchestrator that simulates a software engineering team using AI agents. Learn what the framework does (and crucially, what it doesn't do).",
+      "nodeIds": ["document:README.md"]
+    },
+    {
+      "order": 2,
+      "title": "The Supervisor — Central Orchestrator",
+      "description": "The Supervisor is the entry point for all work. It receives a user 'wish', plans which pods to activate in what order (sequential vs parallel), and generates the exact shell commands needed. Read SUPERVISOR.md to understand its orchestration directives.",
+      "nodeIds": ["document:agents/SUPERVISOR.md", "document:agents/pods/supervisor/PROMPT.md"]
+    },
+    {
+      "order": 3,
+      "title": "Core Activation Script",
+      "description": "activate.sh is the heart of the framework. It loads a pod's PROMPT.md, the shared project context, inter-pod artifacts, and the pod's persistent memory — assembling them into a structured prompt ready to paste into any AI chat.",
+      "nodeIds": ["file:agents/activate.sh"]
+    },
+    {
+      "order": 4,
+      "title": "Specialist Pod Roles",
+      "description": "Each pod has a PROMPT.md defining its role, competencies, and output formats. The six specialists are: Product Owner (roadmap/stories), Backend (APIs/DB), Frontend (UI/components), QA (tests/quality gates), Security (OWASP/JWT), and DevOps (CI-CD/infra).",
+      "nodeIds": [
+        "document:agents/pods/po/PROMPT.md",
+        "document:agents/pods/backend/PROMPT.md",
+        "document:agents/pods/frontend/PROMPT.md",
+        "document:agents/pods/qa/PROMPT.md",
+        "document:agents/pods/sec/PROMPT.md",
+        "document:agents/pods/devops/PROMPT.md"
+      ]
+    },
+    {
+      "order": 5,
+      "title": "Shared Project Context",
+      "description": "context/shared/project.md is injected into every pod activation. It defines the current project (TaskFlow), tech stack, architectural decisions, and coding standards — ensuring all AI agents operate with the same ground truth.",
+      "nodeIds": ["document:agents/context/shared/project.md"]
+    },
+    {
+      "order": 6,
+      "title": "Persistent Pod Memory",
+      "description": "Each pod has a memory.md that records its task history across sessions. update_memory.sh appends AI output summaries, archive_memory.sh trims old entries, and status.sh displays the full history — implementing session persistence without a database.",
+      "nodeIds": [
+        "file:agents/update_memory.sh",
+        "file:agents/archive_memory.sh",
+        "file:agents/status.sh",
+        "document:agents/pods/po/memory.md",
+        "document:agents/pods/backend/memory.md"
+      ]
+    },
+    {
+      "order": 7,
+      "title": "Chain Workflows",
+      "description": "run_chain.sh executes .chain files that define multi-pod workflows. The auth.chain shows a complete 4-step workflow: PO → Backend+Frontend (parallel) → QA+Security (parallel) → DevOps, demonstrating the sequential/parallel orchestration model.",
+      "nodeIds": [
+        "file:agents/run_chain.sh",
+        "config:agents/chains/auth.chain",
+        "config:agents/chains/ecommerce.chain",
+        "config:agents/chains/saas-mvp.chain"
+      ]
+    },
+    {
+      "order": 8,
+      "title": "Quality & Health Checks",
+      "description": "doctor.sh validates the full framework setup (scripts, pod files, chains). The smoke test suite and CI pipeline ensure all shell scripts pass shellcheck and behavioral tests on every push.",
+      "nodeIds": [
+        "file:agents/doctor.sh",
+        "file:agents/tests/run_smoke_tests.sh",
+        "pipeline:.github/workflows/shell-ci.yml"
+      ]
+    },
+    {
+      "order": 9,
+      "title": "Step-by-Step Tutorial",
+      "description": "PASSO-A-PASSO.md walks through a complete real-world scenario using the TaskFlow project — from Supervisor planning to PO, Backend, QA, and DevOps activations — the best way to understand the full workflow in practice.",
+      "nodeIds": ["document:PASSO-A-PASSO.md"]
+    }
+  ]
+}
