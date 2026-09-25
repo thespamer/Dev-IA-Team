@@ -6,10 +6,16 @@
 #      ./update_memory.sh [flags] --stdin <pod> < resposta.md
 #
 # Flags:
-#   --validate         Avisa se o resumo nao segue o bloco '## MEMORY UPDATE'
-#   --strict-validate  Falha se o resumo nao segue o bloco
 #   --stdin            Le o resumo de stdin (para pipe de agente headless)
-#   --task="<texto>"   Tarefa que originou o output (vai no frontmatter e no nome do arquivo)
+#   --task="<texto>"   Tarefa que originou o output (frontmatter e nome do arquivo)
+#   --no-contract      Grava sem exigir o bloco '## MEMORY UPDATE'. A entrada fica
+#                      marcada 'contract: unverified' no frontmatter, para auditoria.
+#   --validate         Aceita por compatibilidade; validar ja e o padrao
+#   --strict-validate  Idem
+#
+# O contrato de memoria e exigido POR PADRAO. O bloco '## MEMORY UPDATE' e
+# extraido da resposta da IA e so ele e persistido — memoria guarda decisao, nao
+# as 400 linhas de resposta.
 #
 # Cada chamada cria UM ARQUIVO NOVO em pods/<pod>/memory/. Nunca faz append.
 # Append no mesmo arquivo gerava conflito de merge toda vez que dois devs
@@ -27,6 +33,8 @@ LOCKS_DIR="$AGENTS_DIR/.locks"
 
 # shellcheck source=lib/memory.sh
 . "$AGENTS_DIR/lib/memory.sh"
+# shellcheck source=lib/contract.sh
+. "$AGENTS_DIR/lib/contract.sh"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -67,17 +75,18 @@ acquire_lock() {
     trap release_lock EXIT INT TERM
 }
 
-VALIDATE=false
-STRICT_VALIDATE=false
+ENFORCE_CONTRACT=true
 FROM_STDIN=false
 TASK=""
 
 while [[ "${1:-}" == --* ]]; do
     case "$1" in
-        --validate) VALIDATE=true; shift ;;
-        --strict-validate) VALIDATE=true; STRICT_VALIDATE=true; shift ;;
+        --no-contract) ENFORCE_CONTRACT=false; shift ;;
         --stdin) FROM_STDIN=true; shift ;;
         --task=*) TASK="${1#*=}"; shift ;;
+        # Validar passou a ser o padrao; as flags antigas seguem aceitas para nao
+        # quebrar scripts e chains existentes.
+        --validate|--strict-validate) shift ;;
         *)
             echo -e "${RED}Flag desconhecida: $1${NC}" >&2
             exit 1
@@ -89,12 +98,17 @@ usage() {
     {
         echo -e "${RED}Erro: Argumentos insuficientes${NC}"
         echo ""
-        echo "Uso: $0 [--validate|--strict-validate] [--task=\"<tarefa>\"] <pod> \"<resumo do output da IA>\""
+        echo "Uso: $0 [--no-contract] [--task=\"<tarefa>\"] <pod> \"<output da IA>\""
         echo "     $0 [flags] --stdin <pod> < resposta.md"
         echo ""
+        echo "O output precisa conter o bloco '## MEMORY UPDATE' com pelo menos 3"
+        echo "bullets de conteudo real. Use --no-contract para gravar sem validar."
+        echo ""
         echo "Exemplo:"
-        echo "  $0 backend \"API de auth implementada: JWT RS256, refresh token, bcrypt 12 rounds\""
-        echo "  $0 po \"US-001 a US-005 criadas, MVP = auth + dashboard, Phase2 = billing\""
+        echo "  $0 backend \"## MEMORY UPDATE"
+        echo "  - POST /auth/login retorna JWT RS256, expiracao 1h"
+        echo "  - Schema users criado com bcrypt rounds=12"
+        echo "  - Refresh token com rotacao a cada uso\""
     } >&2
     exit 1
 }
@@ -124,33 +138,24 @@ if [ ! -f "$STATE_FILE" ]; then
     exit 1
 fi
 
-validate_memory_update_block() {
-    local text="$1"
-    local bullet_count=0
+if [ "$ENFORCE_CONTRACT" = true ]; then
+    # A entrada pode ser a resposta inteira da IA. Recorta o bloco; se nao houver
+    # heading, valida o texto cru para o erro apontar o que de fato falta.
+    BLOCK="$(printf '%s\n' "$SUMMARY" | contract_extract_block)"
+    [ -n "$BLOCK" ] || BLOCK="$SUMMARY"
 
-    if [[ "$text" != *"## MEMORY UPDATE"* ]]; then
-        return 1
+    if ! contract_validate "$BLOCK"; then
+        echo -e "${RED}Erro: contrato de memoria nao cumprido — nada foi gravado${NC}" >&2
+        contract_explain_failure "$POD_NAME"
+        exit 1
     fi
 
-    while IFS= read -r line; do
-        if [[ "$line" =~ ^-[[:space:]]+.+ ]]; then
-            bullet_count=$((bullet_count + 1))
-        fi
-    done <<< "$text"
-
-    [ "$bullet_count" -ge 3 ]
-}
-
-if [ "$VALIDATE" = true ]; then
-    if validate_memory_update_block "$SUMMARY"; then
-        echo -e "${GREEN}✓ Formato MEMORY UPDATE validado${NC}"
-    else
-        echo -e "${YELLOW}[WARN]${NC} Resumo nao parece seguir o bloco '## MEMORY UPDATE' com pelo menos 3 bullets"
-        if [ "$STRICT_VALIDATE" = true ]; then
-            echo -e "${RED}Erro: validacao estrita falhou${NC}" >&2
-            exit 1
-        fi
-    fi
+    SUMMARY="$BLOCK"
+    CONTRACT_STATUS="verified"
+    echo -e "${GREEN}✓ Contrato de memória cumprido${NC}"
+else
+    CONTRACT_STATUS="unverified"
+    echo -e "${YELLOW}[WARN]${NC} Gravando sem validar o contrato (--no-contract)"
 fi
 
 AUTHOR="$(memory_author)"
@@ -174,6 +179,7 @@ SHARD_PATH="$(memory_new_shard_path "$PODS_DIR" "$POD_NAME" "$AUTHOR" "$SLUG")"
     echo "author: $AUTHOR"
     echo "branch: $BRANCH"
     echo "date: $TIMESTAMP"
+    echo "contract: $CONTRACT_STATUS"
     [ -n "$TASK" ] && echo "task: $TASK"
     echo "---"
     echo ""

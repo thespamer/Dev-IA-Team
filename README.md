@@ -296,20 +296,22 @@ Implement GET /api/v1/users with pagination
 After the AI responds, save the key decisions so the next pod sees them:
 
 ```bash
-./update_memory.sh <pod> "<summary>"
-./update_memory.sh --task="<task>" <pod> "<summary>"
+./update_memory.sh <pod> "<AI output>"
+./update_memory.sh --task="<task>" <pod> "<AI output>"
 ./update_memory.sh --stdin <pod> < ai-response.md
-./update_memory.sh --validate <pod> "<summary with MEMORY UPDATE block>"
-./update_memory.sh --strict-validate <pod> "<summary with MEMORY UPDATE block>"
+./update_memory.sh --no-contract <pod> "<free-form note>"
 ```
 
-```bash
-./update_memory.sh backend "API de auth implementada: POST /auth/login retorna JWT RS256 1h,
-POST /auth/register com bcrypt 12 rounds. Schema users (id, email, password_hash, name).
-AuthService com register/login/logout/resetPassword."
+You can hand it the AI's **entire** response — the `## MEMORY UPDATE` block is
+extracted and only that block is stored. Memory keeps the decisions, not the 400
+lines of code you already pasted into your editor.
 
-./update_memory.sh po "US-001 a US-005 criadas. MVP = auth + dashboard (Must Have).
-Phase 2 = billing + social login (Should Have). Total: 18 story points no MVP."
+```bash
+./update_memory.sh --task="Auth API" backend "## MEMORY UPDATE
+- POST /auth/login retorna JWT RS256, expiracao 1h
+- POST /auth/register com bcrypt rounds=12
+- Schema users: id, email, password_hash, name, created_at
+- Refresh token com rotacao a cada uso"
 ```
 
 Each call writes **one new file** under `pods/<pod>/memory/`, stamped with author,
@@ -320,7 +322,8 @@ produce two different files, so there is no merge conflict to resolve.
 | Flag | Effect |
 |------|--------|
 | `--task="<task>"` | Records the originating task in the entry's frontmatter and filename |
-| `--stdin` | Reads the summary from stdin, for piping a headless agent's output |
+| `--stdin` | Reads the output from stdin, for piping a headless agent |
+| `--no-contract` | Writes without requiring the block (see below) |
 
 Author identity comes from `DEVIA_AUTHOR`, falling back to `git config user.email`.
 
@@ -329,18 +332,40 @@ what serializes. Retry behavior:
 - `LOCK_MAX_ATTEMPTS` (default: `100`)
 - `LOCK_SLEEP_SECONDS` (default: `0.1`)
 
-Validation flags:
-- `--validate`: warns if the summary does not include `## MEMORY UPDATE` + at least 3 bullet lines.
-- `--strict-validate`: fails when the summary format does not match that minimum contract.
+#### The memory contract
 
-Example with strict validation:
+Every pod's `PROMPT.md` already requires the AI to end its answer with:
+
+```
+## MEMORY UPDATE
+- <concrete decision 1>
+- <concrete decision 2>
+- <concrete decision 3>
+```
+
+`update_memory.sh` **enforces that by default** — no flag needed. It rejects:
+
+- output with no `## MEMORY UPDATE` block
+- fewer than 3 bullets carrying real content
+- bullets that are entirely the template placeholder, like
+  `- [Endpoints definidos: METHOD /path]`. Persisting the mould instead of the
+  decision is how memory rots, and with several developers it rots that much faster.
+
+A bullet that merely *starts* with a bracket — `- [US-001] Login com email` — is
+real content and passes.
+
+When output fails the contract, nothing is written and the error tells you what to
+do. The escape hatch is one flag:
 
 ```bash
-./update_memory.sh --strict-validate backend "## MEMORY UPDATE
-- [Endpoints definidos/implementados: METHOD /path — descricao]
-- [Schemas criados: tabela — campos principais]
-- [Decisoes arquiteturais: choice feita + motivo]"
+./update_memory.sh --no-contract po "<free-form note>"
 ```
+
+That entry is stamped `contract: unverified` in its frontmatter, so bypasses stay
+auditable — `./doctor.sh` counts them per pod.
+
+`--validate` and `--strict-validate` are still accepted and do nothing; validating
+is the default now.
 
 ---
 

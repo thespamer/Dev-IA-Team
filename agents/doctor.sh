@@ -60,7 +60,7 @@ check_executable() {
 echo -e "${CYAN}=== Dev-IA-Team Doctor ===${NC}"
 echo ""
 
-echo "[1/6] Scripts principais"
+echo "[1/7] Scripts principais"
 check_executable "$AGENTS_DIR/activate.sh" "activate.sh executavel"
 check_executable "$AGENTS_DIR/update_memory.sh" "update_memory.sh executavel"
 check_executable "$AGENTS_DIR/status.sh" "status.sh executavel"
@@ -69,9 +69,10 @@ check_executable "$AGENTS_DIR/archive_memory.sh" "archive_memory.sh executavel"
 check_executable "$AGENTS_DIR/migrate_memory.sh" "migrate_memory.sh executavel"
 check_file "$AGENTS_DIR/lib/memory.sh" "lib/memory.sh presente"
 check_file "$AGENTS_DIR/lib/artifacts.sh" "lib/artifacts.sh presente"
+check_file "$AGENTS_DIR/lib/contract.sh" "lib/contract.sh presente"
 echo ""
 
-echo "[2/6] Pods e arquivos obrigatorios"
+echo "[2/7] Pods e arquivos obrigatorios"
 for pod in po backend frontend qa sec devops; do
     check_file "$PODS_DIR/$pod/PROMPT.md" "$pod/PROMPT.md"
     check_file "$PODS_DIR/$pod/memory.md" "$pod/memory.md"
@@ -79,7 +80,7 @@ done
 check_file "$AGENTS_DIR/SUPERVISOR.md" "SUPERVISOR.md"
 echo ""
 
-echo "[3/6] Contexto compartilhado"
+echo "[3/7] Contexto compartilhado"
 if [ -f "$SHARED_DIR/project.md" ]; then
     if [ -s "$SHARED_DIR/project.md" ]; then
         ok "context/shared/project.md presente e nao vazio"
@@ -91,7 +92,7 @@ else
 fi
 echo ""
 
-echo "[4/6] Manifestos de leitura (reads.txt)"
+echo "[4/7] Manifestos de leitura (reads.txt)"
 # shellcheck source=lib/artifacts.sh
 . "$AGENTS_DIR/lib/artifacts.sh"
 for pod in po backend frontend qa sec devops supervisor; do
@@ -118,7 +119,19 @@ for pod in po backend frontend qa sec devops supervisor; do
 done
 echo ""
 
-echo "[5/6] Chain files"
+echo "[5/7] Contrato de memoria nos prompts"
+for pod in po backend frontend qa sec devops; do
+    prompt="$PODS_DIR/$pod/PROMPT.md"
+    [ -f "$prompt" ] || continue
+    if grep -q "^## MEMORY UPDATE" "$prompt"; then
+        ok "$pod/PROMPT.md exige o bloco MEMORY UPDATE"
+    else
+        fail "$pod/PROMPT.md sem o bloco MEMORY UPDATE — update_memory.sh vai recusar o output"
+    fi
+done
+echo ""
+
+echo "[6/7] Chain files"
 if ls "$CHAINS_DIR"/*.chain >/dev/null 2>&1; then
     for chain in "$CHAINS_DIR"/*.chain; do
         if grep -q "^name=" "$chain"; then
@@ -138,7 +151,7 @@ else
 fi
 echo ""
 
-echo "[6/6] Integridade basica de memoria"
+echo "[7/7] Integridade basica de memoria"
 for pod in po backend frontend qa sec devops supervisor; do
     mem="$PODS_DIR/$pod/memory.md"
     log_dir="$PODS_DIR/$pod/memory"
@@ -158,6 +171,21 @@ for pod in po backend frontend qa sec devops supervisor; do
         warn "$pod/memory/ ausente — rode ./migrate_memory.sh"
     fi
 done
+echo ""
+
+# Contrato de memoria: entradas gravadas com --no-contract ficam marcadas, para
+# a squad ver o quanto esta driblando a validacao.
+unverified_total=0
+for pod in po backend frontend qa sec devops supervisor; do
+    log_dir="$PODS_DIR/$pod/memory"
+    [ -d "$log_dir" ] || continue
+    n=$(grep -l "^contract: unverified" "$log_dir"/*.md 2>/dev/null | wc -l | tr -d " ")
+    unverified_total=$((unverified_total + n))
+    [ "$n" -gt 0 ] && warn "$pod: $n entrada(s) gravada(s) com --no-contract"
+done
+if [ "$unverified_total" -eq 0 ]; then
+    ok "nenhuma entrada de memoria gravada com --no-contract"
+fi
 echo ""
 
 # Memoria em shards: nenhum log legado pode ter sobrado dentro do estado curado

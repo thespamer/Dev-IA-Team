@@ -8,6 +8,7 @@ PO_LOG_DIR="$AGENTS_DIR/pods/po/memory"
 CREATED_SHARDS=()
 SMOKE_ARTIFACTS=()
 MANIFEST_BAK=""
+LAST_NEW_SHARD=""
 
 cleanup() {
     local shard artifact
@@ -26,12 +27,17 @@ cleanup() {
 
 trap cleanup EXIT
 
-# Shards criados durante o teste, para o cleanup remover no fim.
+# Registra os shards criados desde "$before" para o cleanup remover, e guarda o
+# ultimo em LAST_NEW_SHARD. Os testes usam essa variavel em vez de 'tail -1':
+# shards escritos no mesmo segundo ordenam pelo slug, nao pela ordem de escrita.
 snapshot_new_shards() {
     local before="$1" after
     after="$(find "$PO_LOG_DIR" -maxdepth 1 -type f -name '*.md' | LC_ALL=C sort)"
+    LAST_NEW_SHARD=""
     while IFS= read -r line; do
-        [ -n "$line" ] && CREATED_SHARDS+=("$line")
+        [ -n "$line" ] || continue
+        CREATED_SHARDS+=("$line")
+        LAST_NEW_SHARD="$line"
     done <<< "$(comm -13 <(printf '%s\n' "$before") <(printf '%s\n' "$after"))"
 }
 
@@ -42,6 +48,7 @@ list_po_shards() {
 echo "[smoke] Bash syntax check"
 bash -n "$AGENTS_DIR/lib/memory.sh"
 bash -n "$AGENTS_DIR/lib/artifacts.sh"
+bash -n "$AGENTS_DIR/lib/contract.sh"
 bash -n "$AGENTS_DIR/activate.sh"
 bash -n "$AGENTS_DIR/update_memory.sh"
 bash -n "$AGENTS_DIR/status.sh"
@@ -169,22 +176,85 @@ cp "$manifest_bak" "$AGENTS_DIR/pods/devops/reads.txt"
 rm -f "$manifest_bak"
 MANIFEST_BAK=""
 
-echo "[smoke] update_memory strict validation (must fail invalid summary)"
+echo "[smoke] memory contract is enforced by default (no flag needed)"
 before_shards="$(list_po_shards)"
-if "$AGENTS_DIR/update_memory.sh" --strict-validate po "Resumo sem bloco valido" >/dev/null 2>&1; then
-    echo "Expected --strict-validate to fail for invalid summary, but it succeeded"
+if "$AGENTS_DIR/update_memory.sh" po "Resumo sem bloco valido" >/dev/null 2>&1; then
+    echo "Expected the contract to be enforced by default, but the write succeeded"
     exit 1
 fi
 if [ "$before_shards" != "$(list_po_shards)" ]; then
-    echo "Memory shard created after strict validation failure"
+    echo "Memory shard created after a contract failure"
     exit 1
 fi
+
+echo "[smoke] contract rejects template placeholder bullets"
+before_shards="$(list_po_shards)"
+if "$AGENTS_DIR/update_memory.sh" po $'## MEMORY UPDATE\n- [User stories criadas: IDs]\n- [Decisoes de MVP: escopo]\n- [Prioridades: MoSCoW]' >/dev/null 2>&1; then
+    echo "Expected placeholder-only bullets to be rejected"
+    exit 1
+fi
+if [ "$before_shards" != "$(list_po_shards)" ]; then
+    echo "Memory shard created from placeholder-only bullets"
+    exit 1
+fi
+
+echo "[smoke] contract failure message names the escape hatch"
+contract_err="$("$AGENTS_DIR/update_memory.sh" po "sem bloco" 2>&1 >/dev/null || true)"
+if ! printf '%s' "$contract_err" | grep -q -- "--no-contract"; then
+    echo "Contract failure message must tell the dev how to proceed"
+    exit 1
+fi
+
+echo "[smoke] contract keeps bullets that merely start with a bracket"
+before_shards="$(list_po_shards)"
+"$AGENTS_DIR/update_memory.sh" --task="smoke bracket" po \
+    $'## MEMORY UPDATE\n- [US-001] Login com email e senha\n- [US-002] Logout invalida sessao\n- [US-003] Reset de senha por email' >/dev/null
+snapshot_new_shards "$before_shards"
+
+echo "[smoke] contract extracts the block out of a full AI response"
+before_shards="$(list_po_shards)"
+printf 'Segue o codigo:\n\n```js\nconst x = 1;\n```\n\nExplicacao longa que nao deve ir para a memoria.\n\n## MEMORY UPDATE\n- US-010 login social com Google definida\n- US-011 login com GitHub fica para a fase 2\n- MVP inclui apenas Google\n\n## Proximos passos\n- esta secao nao deve ser persistida\n' \
+    | "$AGENTS_DIR/update_memory.sh" --stdin --task="smoke extract" po >/dev/null
+snapshot_new_shards "$before_shards"
+extracted="$LAST_NEW_SHARD"
+if grep -q "const x = 1" "$extracted"; then
+    echo "The AI code block leaked into memory; only the MEMORY UPDATE block should persist"
+    exit 1
+fi
+if grep -q "esta secao nao deve ser persistida" "$extracted"; then
+    echo "Content after the MEMORY UPDATE block leaked into memory"
+    exit 1
+fi
+if ! grep -q "US-010 login social com Google definida" "$extracted"; then
+    echo "The MEMORY UPDATE block itself was not persisted"
+    exit 1
+fi
+if ! grep -q "^contract: verified" "$extracted"; then
+    echo "Shard missing 'contract: verified' stamp"
+    exit 1
+fi
+
+echo "[smoke] --no-contract writes but stamps the entry unverified"
+before_shards="$(list_po_shards)"
+"$AGENTS_DIR/update_memory.sh" --no-contract --task="smoke unverified" po "nota solta sem bloco" >/dev/null
+snapshot_new_shards "$before_shards"
+unverified="$LAST_NEW_SHARD"
+if ! grep -q "^contract: unverified" "$unverified"; then
+    echo "--no-contract must stamp the entry 'contract: unverified' for auditing"
+    exit 1
+fi
+
+echo "[smoke] deprecated validation flags still accepted"
+before_shards="$(list_po_shards)"
+"$AGENTS_DIR/update_memory.sh" --strict-validate --task="smoke compat" po \
+    $'## MEMORY UPDATE\n- compat bullet um com conteudo\n- compat bullet dois com conteudo\n- compat bullet tres com conteudo' >/dev/null
+snapshot_new_shards "$before_shards"
 
 echo "[smoke] update_memory writes a new shard (never appends)"
 before_shards="$(list_po_shards)"
 before_count=$(printf '%s\n' "$before_shards" | grep -c . || true)
-"$AGENTS_DIR/update_memory.sh" --strict-validate --task="smoke shard" po \
-    $'## MEMORY UPDATE\n- shard 1\n- shard 2\n- shard 3' >/dev/null
+"$AGENTS_DIR/update_memory.sh" --task="smoke shard" po \
+    $'## MEMORY UPDATE\n- shard bullet um com conteudo real\n- shard bullet dois com conteudo real\n- shard bullet tres com conteudo real' >/dev/null
 snapshot_new_shards "$before_shards"
 after_count=$(list_po_shards | grep -c . || true)
 if [ "$after_count" -ne "$((before_count + 1))" ]; then
@@ -193,7 +263,7 @@ if [ "$after_count" -ne "$((before_count + 1))" ]; then
 fi
 
 echo "[smoke] shard carries author/branch frontmatter"
-newest="$(list_po_shards | tail -1)"
+newest="$LAST_NEW_SHARD"
 for field in "pod: po" "author:" "branch:" "date:" "task: smoke shard"; do
     if ! grep -q "^$field" "$newest"; then
         echo "Shard missing frontmatter field: $field"
@@ -203,9 +273,9 @@ done
 
 echo "[smoke] concurrent authors never collide on the same file"
 before_shards="$(list_po_shards)"
-DEVIA_AUTHOR=dev-a "$AGENTS_DIR/update_memory.sh" po $'## MEMORY UPDATE\n- a1\n- a2\n- a3' >/dev/null &
+DEVIA_AUTHOR=dev-a "$AGENTS_DIR/update_memory.sh" po $'## MEMORY UPDATE\n- autor a decisao um\n- autor a decisao dois\n- autor a decisao tres' >/dev/null &
 pid_a=$!
-DEVIA_AUTHOR=dev-b "$AGENTS_DIR/update_memory.sh" po $'## MEMORY UPDATE\n- b1\n- b2\n- b3' >/dev/null &
+DEVIA_AUTHOR=dev-b "$AGENTS_DIR/update_memory.sh" po $'## MEMORY UPDATE\n- autor b decisao um\n- autor b decisao dois\n- autor b decisao tres' >/dev/null &
 pid_b=$!
 wait "$pid_a" "$pid_b"
 snapshot_new_shards "$before_shards"
@@ -217,10 +287,10 @@ fi
 
 echo "[smoke] update_memory --stdin"
 before_shards="$(list_po_shards)"
-printf '## MEMORY UPDATE\n- via stdin 1\n- via stdin 2\n- via stdin 3\n' \
-    | "$AGENTS_DIR/update_memory.sh" --strict-validate --stdin --task="smoke stdin" po >/dev/null
+printf '## MEMORY UPDATE\n- via stdin decisao um\n- via stdin decisao dois\n- via stdin decisao tres\n' \
+    | "$AGENTS_DIR/update_memory.sh" --stdin --task="smoke stdin" po >/dev/null
 snapshot_new_shards "$before_shards"
-if ! grep -q "via stdin 1" "$(list_po_shards | tail -1)"; then
+if ! grep -q "via stdin decisao um" "$LAST_NEW_SHARD"; then
     echo "--stdin did not persist the piped summary"
     exit 1
 fi
@@ -229,13 +299,13 @@ echo "[smoke] lock contention on update_memory"
 before_shards="$(list_po_shards)"
 mkdir -p "$AGENTS_DIR/.locks/po-memory.lock"
 ( sleep 0.5; rmdir "$AGENTS_DIR/.locks/po-memory.lock" 2>/dev/null || true ) &
-"$AGENTS_DIR/update_memory.sh" --strict-validate po $'## MEMORY UPDATE\n- teste lock 1\n- teste lock 2\n- teste lock 3' >/dev/null
+"$AGENTS_DIR/update_memory.sh" po $'## MEMORY UPDATE\n- teste de lock decisao um\n- teste de lock decisao dois\n- teste de lock decisao tres' >/dev/null
 snapshot_new_shards "$before_shards"
 
 echo "[smoke] lock timeout on update_memory (must fail)"
 before_shards="$(list_po_shards)"
 mkdir -p "$AGENTS_DIR/.locks/po-memory.lock"
-if LOCK_MAX_ATTEMPTS=3 LOCK_SLEEP_SECONDS=0.01 "$AGENTS_DIR/update_memory.sh" --strict-validate po $'## MEMORY UPDATE\n- timeout 1\n- timeout 2\n- timeout 3' >/dev/null 2>&1; then
+if LOCK_MAX_ATTEMPTS=3 LOCK_SLEEP_SECONDS=0.01 "$AGENTS_DIR/update_memory.sh" po $'## MEMORY UPDATE\n- timeout decisao um\n- timeout decisao dois\n- timeout decisao tres' >/dev/null 2>&1; then
     echo "Expected lock-timeout scenario to fail, but it succeeded"
     exit 1
 fi

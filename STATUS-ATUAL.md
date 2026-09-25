@@ -87,6 +87,31 @@ Ultima atualizacao: 2026-09-24
 - Smoke tests novos: selecao por manifesto, `*` do supervisor, rejeicao de
   traversal, e ativacao limpa de todo pod sem nenhum artefato presente.
 
+## Concluido - Contrato de Memoria Obrigatorio
+
+- `agents/lib/contract.sh` criado: extracao e validacao do bloco
+  `## MEMORY UPDATE`.
+- Validacao passou a ser o PADRAO em `update_memory.sh`. Antes era opt-in
+  (`--validate`), o que deixava a memoria apodrecer com resumo redigitado a mao.
+- O bloco e extraido da resposta completa da IA e so ele e persistido. Da para
+  passar as 400 linhas de resposta; a memoria guarda a decisao, nao o codigo.
+- Bullets que sao apenas o molde entre colchetes (`- [Endpoints definidos: ...]`)
+  sao rejeitados. Colar o template do PROMPT.md guardava o molde em vez da
+  decisao. Bullet que so COMECA com colchete (`- [US-001] Login`) passa.
+- Fallback pensado, nao `exit 1` seco: a mensagem de erro lista os caminhos na
+  ordem (pedir o bloco a IA, escrever os bullets, ou `--no-contract`).
+- `--no-contract` grava sem validar mas marca `contract: unverified` no
+  frontmatter — os desvios ficam auditaveis por grep e o `doctor.sh` os conta.
+- `--validate` e `--strict-validate` seguem aceitas como no-op, para nao quebrar
+  scripts e chains existentes.
+- `doctor.sh` ganhou a etapa [5/7]: verifica que todo `PROMPT.md` exige o bloco,
+  e reporta quantas entradas foram gravadas com `--no-contract`.
+- Smoke tests novos: contrato por padrao, rejeicao de placeholder, mensagem de
+  erro citando a escotilha, bullet com colchete inicial aceito, extracao de
+  resposta completa, e a marca `unverified`.
+- `README.md` e `PASSO-A-PASSO.md` corrigidos: o exemplo anterior ensinava a
+  persistir exatamente o molde entre colchetes que agora e rejeitado.
+
 ## Bugs Pre-existentes Corrigidos
 
 - `tests/lint_text_consistency.sh` falhava no `main` desde o commit 0b6c277:
@@ -114,21 +139,16 @@ Ultima atualizacao: 2026-09-24
 
 ## Pendencias Sugeridas para Proxima Sessao
 
-Prioridade alta (destrava uso por squad):
-
-1. Contrato de memoria obrigatorio: `--strict-validate` por padrao e o bloco
-   `## MEMORY UPDATE` exigido no `PROMPT.md` de cada pod, para a IA emitir o
-   resumo em vez de o humano redigitar. Precisa de fallback pensado para quando
-   a IA nao emitir o bloco — `exit 1` puro vai irritar a squad.
-
 Prioridade media:
 
-2. `CODEOWNERS` por pod (precisa dos handles reais do time no GitHub).
-3. `context/shared/project.md` esta commitado com dados de exemplo (TaskFlow).
+1. `CODEOWNERS` por pod (precisa dos handles reais do time no GitHub).
+2. `context/shared/project.md` esta commitado com dados de exemplo (TaskFlow).
    Virar `project.example.md` e fazer o `doctor.sh` pedir o real no primeiro uso.
-4. Resolver a duplicata do prompt do supervisor e as code fences escapadas.
-5. Revisar os `reads.txt` default: os nomes saem do que cada `PROMPT.md` declara
+3. Resolver a duplicata do prompt do supervisor e as code fences escapadas.
+4. Revisar os `reads.txt` default: os nomes saem do que cada `PROMPT.md` declara
    produzir, mas quem consome o que e decisao de arquitetura do time.
+5. Promover o estado curado: hoje nada ajuda a mover uma decisao de um shard para
+   `memory.md`. E manual e por isso tende a nao acontecer.
 
 Prioridade baixa:
 
@@ -140,4 +160,8 @@ Prioridade baixa:
 
 ## Ponto de Retomada
 
-Retomar pelo item 1 (contrato de memoria obrigatorio).
+Os tres itens que destravavam uso por squad estao feitos: memoria em shards,
+manifesto de artefatos e contrato de memoria. O que resta e decisao do time
+(CODEOWNERS, defaults de `reads.txt`) ou higiene.
+
+Retomar pelo item 1 (CODEOWNERS), que precisa dos handles reais do GitHub.
