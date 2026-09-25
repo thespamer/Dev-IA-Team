@@ -32,10 +32,14 @@ The value is in **coherence**: because every pod shares the same project context
 ```
 agents/
 ├── SUPERVISOR.md              # Orchestrator — activated via ./activate.sh supervisor
-├── activate.sh                # Main script: loads role + memory + task → prints to stdout
+├── activate.sh                # Main script: loads role + memory + task → prints to stdout (read-only)
 ├── status.sh                  # Shows task history across all pods
 ├── update_memory.sh           # Saves AI output back into pod memory
-├── archive_memory.sh          # Archives old memory entries to keep context lean
+├── archive_memory.sh          # Moves old memory entries to memory/archive/
+├── migrate_memory.sh          # One-shot: splits legacy memory.md into memory.md + memory/
+├── lib/
+│   ├── memory.sh              # Shared helpers for the sharded memory layout
+│   └── artifacts.sh           # Reads each pod's reads.txt manifest
 ├── run_chain.sh               # Step-by-step chain runner with ENTER prompts
 ├── doctor.sh                  # Validates setup and required project files
 ├── tests/
@@ -54,7 +58,10 @@ agents/
 └── pods/
     ├── po/
     │   ├── PROMPT.md          # Role definition, skills, output formats, memory instructions
-    │   ├── memory.md          # Persistent task history + AI output summaries
+    │   ├── memory.md          # Curated state — schemas, endpoints, decisions (hand-edited)
+    │   ├── memory/            # Entry log — one file per entry, never appended to
+    │   │   └── archive/       # Older entries, moved out of the prompt by archive_memory.sh
+    │   ├── reads.txt          # Which shared artifacts this pod receives
     │   └── context/           # Artifacts: user_stories.md, roadmap.md, decisions.md
     ├── backend/
     │   ├── PROMPT.md
@@ -80,14 +87,22 @@ agents/
             ↓
 4. The AI executes the task in the role of that pod
             ↓
-5. memory.md is automatically updated with the task input
+5. You run: ./update_memory.sh <pod> "<summary of AI output>"
+            → writes ONE NEW FILE in pods/<pod>/memory/, never appends
             ↓
-6. You run: ./update_memory.sh <pod> "<summary of AI output>"
-            ↓
-7. Next pod activation will see all previous decisions in context
+6. Next pod activation will see all previous decisions in context
 ```
 
 No API keys. No server. No dependencies. Just bash + an AI chat.
+
+**Or skip the copy-paste** — pipe straight into a headless agent:
+
+```bash
+TASK="Implement GET /api/v1/users with pagination"
+./activate.sh --raw backend "$TASK" | claude -p | ./update_memory.sh --stdin --task="$TASK" backend
+```
+
+`--raw` puts only the prompt on stdout; banners and tips go to stderr.
 
 ---
 
@@ -108,6 +123,70 @@ nano context/shared/project.md
 ```
 
 The terminal prints everything. Copy it. Paste into your AI chat. Done.
+
+---
+
+## Who reads what — `reads.txt`
+
+Every pod declares which shared artifacts it receives, in `pods/<pod>/reads.txt`:
+
+```
+# Artefatos que o QA le de context/shared/
+user_stories.md       # PO: criterios de aceite = base dos casos de teste
+api_spec.md           # Backend: endpoints a exercitar
+components.md         # Frontend: componentes e estados
+```
+
+Without this, every pod got **every** file in `context/shared/` — so the prompt
+grew without bound as the squad produced artifacts, and DevOps read the full user
+stories it never uses. With realistically sized artifacts (~15 KB each, 15 of
+them), declaring reads cuts each pod's prompt by 51–78%.
+
+Rules:
+
+- One filename per line, no directories. Entries naming a path outside
+  `context/shared/` are rejected and reported on stderr — a `reads.txt` line is a
+  file that gets pasted into an AI prompt, so `../../../.ssh/id_rsa` must never
+  resolve.
+- `#` starts a comment; blank lines are ignored.
+- A lone `*` restores "read everything" — this is what `supervisor` uses, since
+  planning needs the whole picture.
+- A declared artifact that does not exist yet is skipped silently. Nothing has
+  produced it yet, which is normal.
+- No `reads.txt` at all falls back to reading everything, and `activate.sh` warns.
+
+`project.md` is not listed anywhere: it is the shared project context, always
+loaded for every pod in its own section.
+
+`./doctor.sh` validates every manifest and shows which declared artifacts the
+squad has not produced yet.
+
+---
+
+## Memory layout
+
+Each pod keeps memory in two places, on purpose:
+
+| Path | What it is | Who writes it |
+|------|-----------|---------------|
+| `pods/<pod>/memory.md` | **Curated state** — schemas, endpoints, standing decisions | You, by hand, reviewed in PR |
+| `pods/<pod>/memory/*.md` | **Entry log** — one file per AI output, immutable | `update_memory.sh` |
+| `pods/<pod>/memory/archive/` | Entries retired from the prompt | `archive_memory.sh` |
+
+Both are loaded on every activation. The split exists because they have different
+lifecycles: the log is append-only history, the state is something a human keeps true.
+
+### Migrating an existing checkout
+
+Older versions kept both in a single `memory.md`. Run once:
+
+```bash
+./migrate_memory.sh --dry-run    # show what would move
+./migrate_memory.sh              # split the log out into memory/0000-legacy.md
+```
+
+The curated header stays in `memory.md`; the appended task log becomes a single
+legacy entry. The script is idempotent — re-running it is a no-op.
 
 ---
 
@@ -142,20 +221,27 @@ If it finds critical failures, it exits with non-zero status so you can catch is
 ### `activate.sh` — Activate a pod
 
 ```bash
-./activate.sh [--dry-run] <pod> "<task>"
+./activate.sh [--raw] [--memory-limit=N] <pod> "<task>"
 ```
+
+**`activate.sh` never writes to pod memory.** It only reads. Memory is written by
+`update_memory.sh`, after the AI has actually answered.
 
 | Flag | Effect |
 |------|--------|
-| *(none)* | Loads full context, updates `memory.md` with the task |
-| `--dry-run` | Loads and prints full context, **does NOT update memory** |
+| *(none)* | Prints the full assembled context to stdout |
+| `--raw` | Prints **only the prompt** to stdout; banner and tips go to stderr |
+| `--memory-limit=N` | Include only the N most recent memory entries (default: `20`, `0` = all) |
 
 ```bash
 # Standard activation
 ./activate.sh backend "Implement GET /api/v1/users with pagination"
 
-# Preview what context the pod would receive, without changing memory
-./activate.sh --dry-run backend "Implement GET /api/v1/users with pagination"
+# Clean prompt for a headless agent
+./activate.sh --raw backend "Implement GET /api/v1/users with pagination" | claude -p
+
+# Full memory instead of the last 20 entries
+./activate.sh --memory-limit=0 backend "Audit every endpoint we have shipped"
 
 # Activate the supervisor to get a full execution plan
 ./activate.sh supervisor "I want to build a SaaS with auth, Stripe billing, and team management"
@@ -198,16 +284,10 @@ Implement GET /api/v1/users with pagination
 
 ━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━
 
-✓ Pod ativado com sucesso
-[NOTE] memory.md atualizado com a tarefa
+✓ Pod ativado (memória não foi modificada — activate.sh é read-only)
 [TIP]  Após receber a resposta da IA, salve o output:
        ./update_memory.sh backend "<resumo das decisões>"
 ```
-
-Write operations to `memory.md` are lock-protected to avoid race conditions when multiple terminals run in parallel.
-Lock retry behavior can be tuned with env vars for advanced scenarios:
-- `LOCK_MAX_ATTEMPTS` (default: `100`)
-- `LOCK_SLEEP_SECONDS` (default: `0.1`)
 
 ---
 
@@ -216,35 +296,76 @@ Lock retry behavior can be tuned with env vars for advanced scenarios:
 After the AI responds, save the key decisions so the next pod sees them:
 
 ```bash
-./update_memory.sh <pod> "<summary>"
-./update_memory.sh --validate <pod> "<summary with MEMORY UPDATE block>"
-./update_memory.sh --strict-validate <pod> "<summary with MEMORY UPDATE block>"
+./update_memory.sh <pod> "<AI output>"
+./update_memory.sh --task="<task>" <pod> "<AI output>"
+./update_memory.sh --stdin <pod> < ai-response.md
+./update_memory.sh --no-contract <pod> "<free-form note>"
 ```
+
+You can hand it the AI's **entire** response — the `## MEMORY UPDATE` block is
+extracted and only that block is stored. Memory keeps the decisions, not the 400
+lines of code you already pasted into your editor.
 
 ```bash
-./update_memory.sh backend "API de auth implementada: POST /auth/login retorna JWT RS256 1h,
-POST /auth/register com bcrypt 12 rounds. Schema users (id, email, password_hash, name).
-AuthService com register/login/logout/resetPassword."
-
-./update_memory.sh po "US-001 a US-005 criadas. MVP = auth + dashboard (Must Have).
-Phase 2 = billing + social login (Should Have). Total: 18 story points no MVP."
+./update_memory.sh --task="Auth API" backend "## MEMORY UPDATE
+- POST /auth/login retorna JWT RS256, expiracao 1h
+- POST /auth/register com bcrypt rounds=12
+- Schema users: id, email, password_hash, name, created_at
+- Refresh token com rotacao a cada uso"
 ```
 
-The summary is appended to `memory.md` and will be visible to all future activations of that pod.
-This write path is also lock-protected for safe concurrent usage.
+Each call writes **one new file** under `pods/<pod>/memory/`, stamped with author,
+branch and UTC timestamp — it never appends to a shared file. That is what makes the
+framework safe for several developers at once: two people writing to the same pod
+produce two different files, so there is no merge conflict to resolve.
 
-Validation flags:
-- `--validate`: warns if the summary does not include `## MEMORY UPDATE` + at least 3 bullet lines.
-- `--strict-validate`: fails when the summary format does not match that minimum contract.
+| Flag | Effect |
+|------|--------|
+| `--task="<task>"` | Records the originating task in the entry's frontmatter and filename |
+| `--stdin` | Reads the output from stdin, for piping a headless agent |
+| `--no-contract` | Writes without requiring the block (see below) |
 
-Example with strict validation:
+Author identity comes from `DEVIA_AUTHOR`, falling back to `git config user.email`.
+
+Locks here only serialize processes on the **same machine** — across machines, git is
+what serializes. Retry behavior:
+- `LOCK_MAX_ATTEMPTS` (default: `100`)
+- `LOCK_SLEEP_SECONDS` (default: `0.1`)
+
+#### The memory contract
+
+Every pod's `PROMPT.md` already requires the AI to end its answer with:
+
+```
+## MEMORY UPDATE
+- <concrete decision 1>
+- <concrete decision 2>
+- <concrete decision 3>
+```
+
+`update_memory.sh` **enforces that by default** — no flag needed. It rejects:
+
+- output with no `## MEMORY UPDATE` block
+- fewer than 3 bullets carrying real content
+- bullets that are entirely the template placeholder, like
+  `- [Endpoints definidos: METHOD /path]`. Persisting the mould instead of the
+  decision is how memory rots, and with several developers it rots that much faster.
+
+A bullet that merely *starts* with a bracket — `- [US-001] Login com email` — is
+real content and passes.
+
+When output fails the contract, nothing is written and the error tells you what to
+do. The escape hatch is one flag:
 
 ```bash
-./update_memory.sh --strict-validate backend "## MEMORY UPDATE
-- [Endpoints definidos/implementados: METHOD /path — descricao]
-- [Schemas criados: tabela — campos principais]
-- [Decisoes arquiteturais: choice feita + motivo]"
+./update_memory.sh --no-contract po "<free-form note>"
 ```
+
+That entry is stamped `contract: unverified` in its frontmatter, so bypasses stay
+auditable — `./doctor.sh` counts them per pod.
+
+`--validate` and `--strict-validate` are still accepted and do nothing; validating
+is the default now.
 
 ---
 
@@ -339,16 +460,16 @@ Pressione ENTER quando TODOS os terminais paralelos estiverem concluídos...
 
 ### `archive_memory.sh` — Keep memory lean
 
-When `memory.md` grows too large (old context can exceed LLM limits), archive old entries:
+When a pod accumulates more entries than the prompt should carry, move the old ones out:
 
 ```bash
-./archive_memory.sh                     # Archive all pods, keep last 20 tasks each
-./archive_memory.sh backend             # Archive only backend
-./archive_memory.sh backend --keep=10   # Keep only last 10 tasks in backend
+./archive_memory.sh                     # All pods, keep the 20 most recent entries each
+./archive_memory.sh backend             # Only backend
+./archive_memory.sh backend --keep=10   # Keep only the 10 most recent in backend
 ```
 
-Old entries are moved to `memory_archive.md`. The structured header (project info, schemas, etc.) is always preserved.
-Archive writes are lock-protected to prevent conflicts with parallel `activate.sh` / `update_memory.sh` writes.
+Entries move from `memory/` to `memory/archive/`. They stay in git — they just stop
+being loaded into the prompt. The curated `memory.md` is never touched.
 
 ---
 

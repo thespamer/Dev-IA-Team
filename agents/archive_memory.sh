@@ -1,180 +1,91 @@
 #!/bin/bash
 
-# archive_memory.sh - Arquiva entradas antigas do memory.md
-# Mantém as últimas N tarefas em memory.md e move o restante para memory_archive.md
+# archive_memory.sh - Move entradas antigas de memory/ para memory/archive/
 #
 # Uso: ./archive_memory.sh [pod] [--keep=N]
 #   sem pod:    arquiva todos os pods
-#   --keep=N:   mantém as últimas N tarefas (default: 20)
+#   --keep=N:   mantem as N entradas mais recentes ativas (default: 20)
+#
+# Com memoria em shards, arquivar e mover arquivo — nao cirurgia de linha no
+# meio de um markdown. As entradas continuam versionadas em archive/, so param
+# de entrar no prompt montado por activate.sh.
 #
 # Exemplos:
-#   ./archive_memory.sh                    # arquiva todos, mantém 20 tarefas cada
-#   ./archive_memory.sh backend            # arquiva só backend
-#   ./archive_memory.sh backend --keep=10  # mantém 10 tarefas no backend
+#   ./archive_memory.sh                    # arquiva todos, mantem 20 entradas cada
+#   ./archive_memory.sh backend            # arquiva so backend
+#   ./archive_memory.sh backend --keep=10  # mantem 10 entradas no backend
+
+set -euo pipefail
 
 AGENTS_DIR="$(cd "$(dirname "$0")" && pwd)"
 PODS_DIR="$AGENTS_DIR/pods"
-LOCKS_DIR="$AGENTS_DIR/.locks"
+
+# shellcheck source=lib/memory.sh
+. "$AGENTS_DIR/lib/memory.sh"
 
 GREEN='\033[0;32m'
 YELLOW='\033[1;33m'
 CYAN='\033[0;36m'
 RED='\033[0;31m'
 NC='\033[0m'
-LOCK_HELD=false
-LOCK_PATH=""
-
-release_lock() {
-    if [ "$LOCK_HELD" = true ] && [ -n "$LOCK_PATH" ] && [ -d "$LOCK_PATH" ]; then
-        rmdir "$LOCK_PATH" 2>/dev/null || true
-        LOCK_HELD=false
-        LOCK_PATH=""
-    fi
-}
-
-acquire_lock() {
-    local lock_name="$1"
-    local attempts="${LOCK_MAX_ATTEMPTS:-100}"
-    local sleep_seconds="${LOCK_SLEEP_SECONDS:-0.1}"
-
-    mkdir -p "$LOCKS_DIR"
-    LOCK_PATH="$LOCKS_DIR/$lock_name.lock"
-
-    while ! mkdir "$LOCK_PATH" 2>/dev/null; do
-        attempts=$((attempts - 1))
-        if [ "$attempts" -le 0 ]; then
-            echo -e "${RED}Erro: timeout ao aguardar lock de escrita para '$lock_name'${NC}"
-            echo "Tente novamente em alguns segundos."
-            return 1
-        fi
-        sleep "$sleep_seconds"
-    done
-
-    LOCK_HELD=true
-    return 0
-}
-
-trap release_lock EXIT INT TERM
 
 KEEP=20
 TARGET_POD=""
 
-# Parse args
 for arg in "$@"; do
     case "$arg" in
         --keep=*) KEEP="${arg#*=}" ;;
-        --*) echo -e "${RED}Flag desconhecida: $arg${NC}"; exit 1 ;;
+        --*) echo -e "${RED}Flag desconhecida: $arg${NC}" >&2; exit 1 ;;
         *) TARGET_POD="$arg" ;;
     esac
 done
 
-ALL_PODS=("po" "backend" "frontend" "qa" "sec" "devops" "supervisor")
-
-get_memory_file() {
-    local pod="$1"
-    if [ "$pod" = "supervisor" ]; then
-        echo "$PODS_DIR/supervisor/memory.md"
-    else
-        echo "$PODS_DIR/$pod/memory.md"
-    fi
-}
+if ! [[ "$KEEP" =~ ^[0-9]+$ ]]; then
+    echo -e "${RED}Erro: --keep precisa ser um inteiro >= 0${NC}" >&2
+    exit 1
+fi
 
 archive_pod() {
     local pod="$1"
-    local memory_file
-    memory_file=$(get_memory_file "$pod")
+    local shards total to_archive archive_dir moved=0
 
-    [ ! -f "$memory_file" ] && return
-
-    local task_count
-    task_count=$(grep -c "^## Tarefa Executada" "$memory_file" 2>/dev/null || echo "0")
-
-    if [ "$task_count" -le "$KEEP" ]; then
-        echo -e "  ${YELLOW}[$pod]${NC} $task_count tarefas — abaixo do limite ($KEEP), nada arquivado"
+    shards="$(memory_list_shards "$PODS_DIR" "$pod")"
+    if [ -z "$shards" ]; then
+        echo -e "  ${YELLOW}[$pod]${NC} sem entradas ativas"
         return
     fi
 
-    acquire_lock "$pod-memory" || return
-
-    local to_archive=$((task_count - KEEP))
-    local archive_file
-    if [ "$pod" = "supervisor" ]; then
-        archive_file="$PODS_DIR/supervisor/memory_archive.md"
-    else
-        archive_file="$PODS_DIR/$pod/memory_archive.md"
-    fi
-
-    # Separar o cabeçalho (tudo antes da primeira tarefa) do histórico de tarefas
-    local first_task_line
-    first_task_line=$(grep -n "^## Tarefa Executada" "$memory_file" | head -1 | cut -d: -f1)
-
-    if [ -z "$first_task_line" ]; then
-        echo -e "  ${YELLOW}[$pod]${NC} Nenhuma entrada de tarefa encontrada"
-        release_lock
+    total=$(printf '%s\n' "$shards" | grep -c .)
+    if [ "$total" -le "$KEEP" ]; then
+        echo -e "  ${YELLOW}[$pod]${NC} $total entrada(s) — abaixo do limite ($KEEP), nada arquivado"
         return
     fi
 
-    # Cabeçalho = linhas antes da primeira tarefa
-    local header
-    header=$(head -n $((first_task_line - 1)) "$memory_file")
+    to_archive=$((total - KEEP))
+    archive_dir="$(memory_archive_dir "$PODS_DIR" "$pod")"
+    mkdir -p "$archive_dir"
 
-    # Todas as linhas de tarefa agrupadas (cada tarefa começa com "## Tarefa Executada")
-    # Separar em blocos por tarefa
-    local tmp_tasks
-    tmp_tasks=$(mktemp)
-    tail -n "+$first_task_line" "$memory_file" > "$tmp_tasks"
+    # Shards saem ordenados por timestamp: as primeiras sao as mais antigas.
+    while IFS= read -r shard; do
+        [ -n "$shard" ] || continue
+        mv "$shard" "$archive_dir/$(basename "$shard")"
+        moved=$((moved + 1))
+    done <<< "$(printf '%s\n' "$shards" | head -n "$to_archive")"
 
-    # Contar início de cada bloco de tarefa
-    local task_starts
-    task_starts=$(grep -n "^## Tarefa Executada" "$tmp_tasks" | cut -d: -f1)
-    local task_starts_array=($task_starts)
-    local total=${#task_starts_array[@]}
-
-    # Linha de início das tarefas a arquivar (as mais antigas = primeiras)
-    local archive_end_task=$((to_archive))
-    local last_archive_start=${task_starts_array[$((archive_end_task - 1))]}
-
-    # Próximo bloco = início das tarefas a manter
-    local keep_start
-    if [ "$archive_end_task" -lt "$total" ]; then
-        keep_start=${task_starts_array[$archive_end_task]}
-    else
-        keep_start=$(($(wc -l < "$tmp_tasks") + 1))
-    fi
-
-    # Append no arquivo de archive
-    {
-        echo ""
-        echo "## Archived em $(date '+%Y-%m-%d %H:%M:%S') — $to_archive entrada(s)"
-        echo ""
-        head -n $((keep_start - 1)) "$tmp_tasks"
-    } >> "$archive_file"
-
-    # Reescrever memory.md com cabeçalho + tarefas recentes
-    {
-        echo "$header"
-        echo ""
-        tail -n "+$keep_start" "$tmp_tasks"
-    } > "$memory_file"
-
-    rm "$tmp_tasks"
-
-    echo -e "  ${GREEN}[$pod]${NC} Arquivadas $to_archive tarefas → $(basename "$archive_file")  (mantidas: $KEEP)"
-    release_lock
+    echo -e "  ${GREEN}[$pod]${NC} $moved entrada(s) → memory/archive/  (mantidas ativas: $KEEP)"
 }
 
-echo -e "${CYAN}=== archive_memory.sh — mantendo últimas $KEEP tarefas por pod ===${NC}"
+echo -e "${CYAN}=== archive_memory.sh — mantendo últimas $KEEP entradas por pod ===${NC}"
 echo ""
 
 if [ -n "$TARGET_POD" ]; then
-    VALID_PODS=("po" "qa" "backend" "frontend" "sec" "devops" "supervisor")
-    if [[ ! " ${VALID_PODS[@]} " =~ " $TARGET_POD " ]]; then
-        echo -e "${RED}Pod '$TARGET_POD' inválido${NC}"
+    if ! memory_is_valid_pod "$TARGET_POD"; then
+        echo -e "${RED}Pod '$TARGET_POD' inválido. Disponíveis: ${MEMORY_VALID_PODS[*]}${NC}" >&2
         exit 1
     fi
     archive_pod "$TARGET_POD"
 else
-    for pod in "${ALL_PODS[@]}"; do
+    for pod in "${MEMORY_VALID_PODS[@]}"; do
         archive_pod "$pod"
     done
 fi

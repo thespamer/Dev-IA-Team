@@ -34,6 +34,3 @@
 ## Last Updated
 [Data da última atualização]
 
-## Tarefa Executada em 2026-03-18 17:26:12
-**Task**: Criar roadmap para sprint 1
-

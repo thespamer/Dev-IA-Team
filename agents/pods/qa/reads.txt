@@ -1,0 +1,10 @@
+# Artefatos que o QA le de context/shared/
+#
+# QA testa contra o que foi especificado: precisa do escopo do PO e da
+# superficie real que backend e frontend construiram.
+
+user_stories.md       # PO: criterios de aceite = base dos casos de teste
+api_spec.md           # Backend: endpoints a exercitar
+schemas.md            # Backend: constraints a validar
+components.md         # Frontend: componentes e estados
+pages.md              # Frontend: fluxos para E2E

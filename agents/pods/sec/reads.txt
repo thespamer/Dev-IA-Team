@@ -1,0 +1,11 @@
+# Artefatos que o Security le de context/shared/
+#
+# Sec revisa o que foi de fato construido, em toda a superficie.
+
+api_spec.md           # Backend: authn/authz, rate limiting, exposicao
+schemas.md            # Backend: dados sensiveis, criptografia em repouso
+services.md           # Backend: limites de confianca entre servicos
+components.md         # Frontend: XSS, manuseio de token no cliente
+infrastructure.md     # DevOps: rede, IAM, exposicao publica
+docker.md             # DevOps: imagem base, usuario root, segredos no build
+pipelines.md          # DevOps: segredos no CI, gates de scan

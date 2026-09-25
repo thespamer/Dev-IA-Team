@@ -286,15 +286,26 @@ Em cada etapa:
 2. Copia → cola na IA → recebe a resposta
 3. `./update_memory.sh <pod> "<resumo>"` → salva para o próximo agente ler
 
-Opcional para reforcar padrao de memoria:
+O contrato de memoria e exigido por padrao: o output precisa conter o bloco
+`## MEMORY UPDATE` com ao menos 3 bullets de conteudo real. Voce pode colar a
+resposta inteira da IA — so o bloco e persistido.
 
 ```bash
-./update_memory.sh --validate <pod> "<resumo>"
-./update_memory.sh --strict-validate <pod> "<resumo>"
+./update_memory.sh <pod> "<resposta da IA>"
+./update_memory.sh --stdin <pod> < resposta.md
 ```
 
-- `--validate`: avisa se o resumo nao tiver bloco `## MEMORY UPDATE` com ao menos 3 bullets.
-- `--strict-validate`: bloqueia salvamento quando o formato minimo nao for atendido.
+Bullets que sao apenas o molde entre colchetes (`- [Endpoints definidos: ...]`)
+nao contam: guardar o molde em vez da decisao e o que apodrece a memoria.
+
+Para gravar uma nota livre, sem validar:
+
+```bash
+./update_memory.sh --no-contract <pod> "<nota>"
+```
+
+A entrada fica marcada `contract: unverified` no frontmatter, e o `./doctor.sh`
+conta quantas existem por pod.
 
 ---
 

@@ -1,10 +1,19 @@
 #!/bin/bash
 
 # activate.sh - Ativa um pod especializado com contexto completo
-# Uso: ./activate.sh [--dry-run] <pod-name> "<task>"
+# Uso: ./activate.sh [--raw] [--memory-limit=N] <pod-name> "<task>"
 #
 # Flags:
-#   --dry-run   Exibe contexto sem atualizar memory.md
+#   --raw              Emite SOMENTE o prompt em stdout (banner/dicas vao para stderr).
+#                      Use para pipe em agente headless:
+#                        ./activate.sh --raw backend "task" | claude -p
+#   --memory-limit=N   Le apenas as N entradas de memoria mais recentes (default: 20, 0 = todas)
+#   --dry-run          Alias historico de --raw=false sem efeito de escrita (mantido por
+#                      compatibilidade; activate.sh nao escreve mais em memory.md)
+#
+# Este script e READ-ONLY sobre a memoria dos pods. A memoria so e escrita por
+# update_memory.sh, depois que a IA responde. Registrar a tarefa antes da resposta
+# enchia memory.md de entradas sem output e dobrava a superficie de conflito no git.
 #
 # Pods: po, backend, frontend, qa, sec, devops, supervisor
 
@@ -13,7 +22,12 @@ set -e
 AGENTS_DIR="$(cd "$(dirname "$0")" && pwd)"
 PODS_DIR="$AGENTS_DIR/pods"
 SHARED_CONTEXT_DIR="$AGENTS_DIR/context/shared"
-LOCKS_DIR="$AGENTS_DIR/.locks"
+RUNLOG_DIR="$AGENTS_DIR/.runlog"
+
+# shellcheck source=lib/memory.sh
+. "$AGENTS_DIR/lib/memory.sh"
+# shellcheck source=lib/artifacts.sh
+. "$AGENTS_DIR/lib/artifacts.sh"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -22,103 +36,118 @@ BLUE='\033[0;34m'
 CYAN='\033[0;36m'
 NC='\033[0m'
 
-DRY_RUN=false
-LOCK_HELD=false
-LOCK_PATH=""
+RAW=false
+MEMORY_LIMIT=20
 
-release_lock() {
-    if [ "$LOCK_HELD" = true ] && [ -n "$LOCK_PATH" ] && [ -d "$LOCK_PATH" ]; then
-        rmdir "$LOCK_PATH" 2>/dev/null || true
+# Chrome (banner, dicas, avisos). Em --raw vai para stderr para nao poluir o prompt.
+say() {
+    if [ "$RAW" = true ]; then
+        echo -e "$@" >&2
+    else
+        echo -e "$@"
     fi
 }
 
-acquire_lock() {
-    local lock_name="$1"
-    local attempts="${LOCK_MAX_ATTEMPTS:-100}"
-    local sleep_seconds="${LOCK_SLEEP_SECONDS:-0.1}"
+# Conteudo do prompt. Sempre stdout.
+emit() {
+    echo "$@"
+}
 
-    mkdir -p "$LOCKS_DIR"
-    LOCK_PATH="$LOCKS_DIR/$lock_name.lock"
+# Separadores visuais: ruido em --raw, estrutura no modo copia-e-cola.
+sep() {
+    if [ "$RAW" = true ]; then
+        emit ""
+    else
+        emit "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
+        emit ""
+    fi
+}
 
-    while ! mkdir "$LOCK_PATH" 2>/dev/null; do
-        attempts=$((attempts - 1))
-        if [ "$attempts" -le 0 ]; then
-            echo -e "${RED}Erro: timeout ao aguardar lock de escrita para '$lock_name'${NC}"
-            echo "Tente novamente em alguns segundos."
-            exit 1
-        fi
-        sleep "$sleep_seconds"
-    done
-
-    LOCK_HELD=true
-    trap release_lock EXIT INT TERM
+# Cabecalho de secao: sem cor em --raw (escapes ANSI viram conteudo no prompt).
+section() {
+    local title="$1" color="$2"
+    if [ "$RAW" = true ]; then
+        emit "=== $title ==="
+    else
+        echo -e "${color}=== $title ===${NC}"
+    fi
+    emit ""
 }
 
 # Parse flags
 while [[ "$1" == --* ]]; do
     case "$1" in
-        --dry-run) DRY_RUN=true; shift ;;
-        *) echo -e "${RED}Flag desconhecida: $1${NC}"; exit 1 ;;
+        --raw) RAW=true; shift ;;
+        --dry-run) shift ;;
+        --memory-limit=*) MEMORY_LIMIT="${1#*=}"; shift ;;
+        *) echo -e "${RED}Flag desconhecida: $1${NC}" >&2; exit 1 ;;
     esac
 done
 
+if ! [[ "$MEMORY_LIMIT" =~ ^[0-9]+$ ]]; then
+    echo -e "${RED}Erro: --memory-limit precisa ser um inteiro >= 0${NC}" >&2
+    exit 1
+fi
+
 if [ $# -lt 2 ]; then
-    echo -e "${RED}Erro: Argumentos insuficientes${NC}"
-    echo ""
-    echo "Uso: $0 [--dry-run] <pod-name> \"<task>\""
-    echo ""
-    echo "Pods disponíveis:"
-    echo "  po         Product Owner"
-    echo "  backend    Backend Developers"
-    echo "  frontend   Frontend Developers"
-    echo "  qa         Quality Assurance"
-    echo "  sec        Security Engineers"
-    echo "  devops     DevOps Analysts"
-    echo "  supervisor Supervisor (orquestrador)"
-    echo ""
-    echo "Flags:"
-    echo "  --dry-run  Mostra contexto sem atualizar memory.md"
+    {
+        echo -e "${RED}Erro: Argumentos insuficientes${NC}"
+        echo ""
+        echo "Uso: $0 [--raw] [--memory-limit=N] <pod-name> \"<task>\""
+        echo ""
+        echo "Pods disponíveis:"
+        echo "  po         Product Owner"
+        echo "  backend    Backend Developers"
+        echo "  frontend   Frontend Developers"
+        echo "  qa         Quality Assurance"
+        echo "  sec        Security Engineers"
+        echo "  devops     DevOps Analysts"
+        echo "  supervisor Supervisor (orquestrador)"
+        echo ""
+        echo "Flags:"
+        echo "  --raw              Só o prompt em stdout (para pipe em agente headless)"
+        echo "  --memory-limit=N   Últimas N entradas de memória (default: 20, 0 = todas)"
+    } >&2
     exit 1
 fi
 
 POD_NAME="$1"
 TASK="$2"
 
-VALID_PODS=("po" "qa" "backend" "frontend" "sec" "devops" "supervisor")
-if [[ ! " ${VALID_PODS[@]} " =~ " ${POD_NAME} " ]]; then
-    echo -e "${RED}Erro: Pod '$POD_NAME' não é válido${NC}"
-    echo "Pods disponíveis: ${VALID_PODS[*]}"
+if ! memory_is_valid_pod "$POD_NAME"; then
+    echo -e "${RED}Erro: Pod '$POD_NAME' não é válido${NC}" >&2
+    echo "Pods disponíveis: ${MEMORY_VALID_PODS[*]}" >&2
     exit 1
 fi
 
-# Supervisor é especial: vive em agents/ com sua própria pasta de memória
+# Supervisor e especial: o PROMPT vive em agents/SUPERVISOR.md, a memoria em pods/supervisor/
 if [ "$POD_NAME" = "supervisor" ]; then
-    POD_DIR="$AGENTS_DIR"
+    POD_DIR="$PODS_DIR/supervisor"
     PROMPT_FILE="$AGENTS_DIR/SUPERVISOR.md"
-    MEMORY_FILE="$PODS_DIR/supervisor/memory.md"
-    mkdir -p "$PODS_DIR/supervisor"
-    [ ! -f "$MEMORY_FILE" ] && echo "# Supervisor - Memória Persistente" > "$MEMORY_FILE"
+    mkdir -p "$POD_DIR"
 else
     POD_DIR="$PODS_DIR/$POD_NAME"
     PROMPT_FILE="$POD_DIR/PROMPT.md"
-    MEMORY_FILE="$POD_DIR/memory.md"
 fi
+
+STATE_FILE="$(memory_state_file "$PODS_DIR" "$POD_NAME")"
+LOG_DIR="$(memory_log_dir "$PODS_DIR" "$POD_NAME")"
 
 if [ ! -f "$PROMPT_FILE" ]; then
-    echo -e "${RED}Erro: PROMPT.md não encontrado para '$POD_NAME'${NC}"
+    echo -e "${RED}Erro: PROMPT.md não encontrado para '$POD_NAME'${NC}" >&2
     exit 1
 fi
 
-if [ ! -f "$MEMORY_FILE" ]; then
-    echo -e "${RED}Erro: memory.md não encontrado para '$POD_NAME'${NC}"
-    exit 1
+if [ ! -f "$STATE_FILE" ]; then
+    if [ "$POD_NAME" = "supervisor" ]; then
+        echo "# Supervisor - Memória Persistente" > "$STATE_FILE"
+    else
+        echo -e "${RED}Erro: memory.md não encontrado para '$POD_NAME'${NC}" >&2
+        exit 1
+    fi
 fi
 
-# Garante que context/ e context/shared/ existem
-if [ "$POD_NAME" != "supervisor" ]; then
-    mkdir -p "$POD_DIR/context"
-fi
-mkdir -p "$SHARED_CONTEXT_DIR"
+mkdir -p "$POD_DIR/context" "$LOG_DIR" "$SHARED_CONTEXT_DIR"
 
 get_pod_display_name() {
     case "$POD_NAME" in
@@ -132,89 +161,96 @@ get_pod_display_name() {
     esac
 }
 
-DRY_LABEL=""
-[ "$DRY_RUN" = true ] && DRY_LABEL=" ${YELLOW}[DRY RUN]${NC}"
-
-echo -e "${BLUE}╔══════════════════════════════════════════════════════════╗${NC}"
-echo -e "${BLUE}║${NC}  $(get_pod_display_name) Pod Activated${DRY_LABEL}"
-echo -e "${BLUE}╚══════════════════════════════════════════════════════════╝${NC}"
-echo ""
-echo -e "${YELLOW}[INFO]${NC} Pod:  $(get_pod_display_name) ($POD_NAME)"
-echo -e "${YELLOW}[INFO]${NC} Task: $TASK"
-[ "$DRY_RUN" = true ] && echo -e "${YELLOW}[DRY RUN]${NC} memory.md NÃO será atualizado"
-echo ""
+say "${BLUE}╔══════════════════════════════════════════════════════════╗${NC}"
+say "${BLUE}║${NC}  $(get_pod_display_name) Pod Activated"
+say "${BLUE}╚══════════════════════════════════════════════════════════╝${NC}"
+say ""
+say "${YELLOW}[INFO]${NC} Pod:  $(get_pod_display_name) ($POD_NAME)"
+say "${YELLOW}[INFO]${NC} Task: $TASK"
+say ""
 
 # ── SYSTEM PROMPT ──────────────────────────────────────────────
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
-echo -e "${GREEN}=== SYSTEM PROMPT ===${NC}"
-echo ""
+sep
+section "SYSTEM PROMPT" "$GREEN"
 cat "$PROMPT_FILE"
-echo ""
+emit ""
 
 # ── SHARED PROJECT CONTEXT ─────────────────────────────────────
 if [ -f "$SHARED_CONTEXT_DIR/project.md" ] && [ -s "$SHARED_CONTEXT_DIR/project.md" ]; then
-    echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-    echo ""
-    echo -e "${CYAN}=== SHARED PROJECT CONTEXT ===${NC}"
-    echo ""
+    sep
+    section "SHARED PROJECT CONTEXT" "$CYAN"
     cat "$SHARED_CONTEXT_DIR/project.md"
-    echo ""
+    emit ""
 fi
 
 # ── INTER-POD ARTIFACTS ────────────────────────────────────────
-ARTIFACTS_SHOWN=false
-for artifact_file in "$SHARED_CONTEXT_DIR"/*.md; do
-    [ "$artifact_file" = "$SHARED_CONTEXT_DIR/project.md" ] && continue
-    if [ -f "$artifact_file" ] && [ -s "$artifact_file" ]; then
-        if [ "$ARTIFACTS_SHOWN" = false ]; then
-            echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-            echo ""
-            echo -e "${CYAN}=== INTER-POD ARTIFACTS (outputs de outros pods) ===${NC}"
-            echo ""
-            ARTIFACTS_SHOWN=true
-        fi
-        artifact_name=$(basename "$artifact_file" .md)
-        echo -e "${CYAN}--- $artifact_name ---${NC}"
-        cat "$artifact_file"
-        echo ""
-    fi
-done
+# O que entra aqui vem de pods/<pod>/reads.txt. Sem manifesto o pod recebe todo
+# context/shared/*.md, que e o comportamento antigo e faz o prompt crescer sem
+# teto conforme a squad produz artefatos.
+MANIFEST="$(artifacts_manifest_path "$PODS_DIR" "$POD_NAME")"
+if [ ! -f "$MANIFEST" ]; then
+    say "${YELLOW}[WARN]${NC} $POD_NAME sem reads.txt — recebendo todo context/shared/"
+fi
 
-# ── MEMORY ────────────────────────────────────────────────────
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
-echo -e "${GREEN}=== MEMORY (Contexto Persistente) ===${NC}"
-echo ""
-cat "$MEMORY_FILE"
-echo ""
+ARTIFACTS="$(artifacts_for_pod "$PODS_DIR" "$SHARED_CONTEXT_DIR" "$POD_NAME")"
+if [ -n "$ARTIFACTS" ]; then
+    sep
+    section "INTER-POD ARTIFACTS (outputs de outros pods)" "$CYAN"
+    ARTIFACT_COUNT=0
+    while IFS= read -r artifact_file; do
+        [ -n "$artifact_file" ] || continue
+        emit "--- $(basename "$artifact_file" .md) ---"
+        cat "$artifact_file"
+        emit ""
+        ARTIFACT_COUNT=$((ARTIFACT_COUNT + 1))
+    done <<< "$ARTIFACTS"
+    say "${YELLOW}[INFO]${NC} Artefatos: $ARTIFACT_COUNT"
+fi
+
+# ── MEMORY: ESTADO CURADO ─────────────────────────────────────
+sep
+section "MEMORY — ESTADO ATUAL DO POD" "$GREEN"
+cat "$STATE_FILE"
+emit ""
+
+# ── MEMORY: LOG DE ENTRADAS (shards) ──────────────────────────
+SHARDS="$(memory_list_shards "$PODS_DIR" "$POD_NAME")"
+if [ -n "$SHARDS" ]; then
+    SHARD_TOTAL=$(printf '%s\n' "$SHARDS" | grep -c .)
+    if [ "$MEMORY_LIMIT" -gt 0 ] && [ "$SHARD_TOTAL" -gt "$MEMORY_LIMIT" ]; then
+        SELECTED="$(printf '%s\n' "$SHARDS" | tail -n "$MEMORY_LIMIT")"
+        say "${YELLOW}[INFO]${NC} Memória: $MEMORY_LIMIT de $SHARD_TOTAL entradas (--memory-limit=0 para todas)"
+    else
+        SELECTED="$SHARDS"
+        say "${YELLOW}[INFO]${NC} Memória: $SHARD_TOTAL entrada(s)"
+    fi
+
+    sep
+    section "MEMORY — HISTÓRICO DE DECISÕES" "$GREEN"
+    while IFS= read -r shard; do
+        [ -n "$shard" ] || continue
+        cat "$shard"
+        emit ""
+    done <<< "$SELECTED"
+fi
 
 # ── TASK ──────────────────────────────────────────────────────
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
-echo -e "${GREEN}=== TASK TO EXECUTE ===${NC}"
-echo ""
-echo "$TASK"
-echo ""
-echo "━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━"
-echo ""
+sep
+section "TASK TO EXECUTE" "$GREEN"
+emit "$TASK"
+emit ""
+sep
 
-# ── UPDATE MEMORY ─────────────────────────────────────────────
-if [ "$DRY_RUN" = false ]; then
-    acquire_lock "$POD_NAME-memory"
-    TIMESTAMP=$(date '+%Y-%m-%d %H:%M:%S')
-    {
-        echo ""
-        echo "## Tarefa Executada em $TIMESTAMP"
-        echo "**Task**: $TASK"
-        echo ""
-    } >> "$MEMORY_FILE"
+# ── RUN LOG ───────────────────────────────────────────────────
+# Um arquivo por autor: append concorrente entre devs nunca colide no git.
+AUTHOR="$(memory_author)"
+mkdir -p "$RUNLOG_DIR"
+printf '%s\t%s\t%s\t%s\n' \
+    "$(date -u '+%Y-%m-%dT%H:%M:%SZ')" "$POD_NAME" "$(memory_branch)" "$TASK" \
+    >> "$RUNLOG_DIR/$AUTHOR.log"
 
-    echo -e "${GREEN}✓ Pod ativado com sucesso${NC}"
-    echo -e "${YELLOW}[NOTE]${NC} memory.md atualizado com a tarefa"
-    echo -e "${YELLOW}[TIP]${NC}  Após receber a resposta da IA, salve o output:"
-    echo -e "         ${CYAN}./update_memory.sh $POD_NAME \"<resumo das decisões>\"${NC}"
-else
-    echo -e "${YELLOW}[DRY RUN]${NC} memory.md NÃO foi atualizado"
-fi
-echo ""
+say "${GREEN}✓ Pod ativado (memória não foi modificada — activate.sh é read-only)${NC}"
+say "${YELLOW}[TIP]${NC}  Após receber a resposta da IA, salve o output:"
+say "         ${CYAN}./update_memory.sh $POD_NAME \"<resumo das decisões>\"${NC}"
+say "${YELLOW}[TIP]${NC}  Headless: ${CYAN}./activate.sh --raw $POD_NAME \"<task>\" | claude -p${NC}"
+say ""
