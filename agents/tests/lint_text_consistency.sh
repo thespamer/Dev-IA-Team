@@ -10,6 +10,13 @@ echo "[text-lint] Checking pod prompts"
 for prompt in "$PODS_DIR"/*/PROMPT.md; do
     [ -f "$prompt" ] || continue
 
+    # Supervisor e orquestrador, nao pod especialista: nao tem secao de
+    # competencias. O prompt vivo dele e agents/SUPERVISOR.md — activate.sh le
+    # de la, nao daqui.
+    if [ "$(basename "$(dirname "$prompt")")" = "supervisor" ]; then
+        continue
+    fi
+
     if grep -q "^## Skills$" "$prompt"; then
         echo "Found legacy heading '## Skills' in: $prompt"
         exit 1
