@@ -1,12 +1,17 @@
 #!/bin/bash
 
-# status.sh - Mostra histórico de tarefas de todos os pods
+# status.sh - Mostra histórico de entradas de memória de todos os pods
 # Uso: ./status.sh [pod]
-#   sem argumento: mostra resumo de todos os pods
-#   com pod:       mostra histórico completo do pod
+#   sem argumento: resumo de todos os pods
+#   com pod:       histórico completo do pod
+
+set -uo pipefail
 
 AGENTS_DIR="$(cd "$(dirname "$0")" && pwd)"
 PODS_DIR="$AGENTS_DIR/pods"
+
+# shellcheck source=lib/memory.sh
+. "$AGENTS_DIR/lib/memory.sh"
 
 BLUE='\033[0;34m'
 GREEN='\033[0;32m'
@@ -15,86 +20,96 @@ CYAN='\033[0;36m'
 RED='\033[0;31m'
 NC='\033[0m'
 
-ALL_PODS=("po" "backend" "frontend" "qa" "sec" "devops" "supervisor")
-declare -A POD_NAMES=(
-    [po]="Product Owner"
-    [backend]="Backend Developers"
-    [frontend]="Frontend Developers"
-    [qa]="Quality Assurance"
-    [sec]="Security Engineers"
-    [devops]="DevOps Analysts"
-    [supervisor]="Supervisor"
-)
+# case em vez de array associativo: bash 3.2 (padrao no macOS) nao tem declare -A.
+pod_display_name() {
+    case "$1" in
+        po)         echo "Product Owner" ;;
+        backend)    echo "Backend Developers" ;;
+        frontend)   echo "Frontend Developers" ;;
+        qa)         echo "Quality Assurance" ;;
+        sec)        echo "Security Engineers" ;;
+        devops)     echo "DevOps Analysts" ;;
+        supervisor) echo "Supervisor" ;;
+        *)          echo "$1" ;;
+    esac
+}
 
-get_memory_file() {
-    local pod="$1"
-    if [ "$pod" = "supervisor" ]; then
-        echo "$PODS_DIR/supervisor/memory.md"
-    else
-        echo "$PODS_DIR/$pod/memory.md"
+# Rotulo curto de um shard: data, autor e tarefa (ou primeira linha util).
+shard_label() {
+    local shard="$1" date author task
+    date="$(memory_shard_field "$shard" "date")"
+    author="$(memory_shard_field "$shard" "author")"
+    task="$(memory_shard_field "$shard" "task")"
+
+    if [ -z "$task" ]; then
+        task="$(memory_shard_body "$shard" | grep -v '^#' | grep -m1 . || true)"
     fi
+    [ -z "$date" ] && date="$(basename "$shard" | cut -d- -f1)"
+    [ -z "$author" ] && author="?"
+
+    printf '%s\t%s\t%s' "$date" "$author" "${task:-(sem descrição)}"
 }
 
 show_pod_detail() {
-    local pod="$1"
-    local memory_file
-    memory_file=$(get_memory_file "$pod")
+    local pod="$1" shards archive_count
 
-    if [ ! -f "$memory_file" ]; then
-        echo -e "${RED}memory.md não encontrado para '$pod'${NC}"
+    echo -e "${BLUE}╔══════════════════════════════════════════════════════════╗${NC}"
+    echo -e "${BLUE}║${NC}  $(pod_display_name "$pod") — Histórico Completo"
+    echo -e "${BLUE}╚══════════════════════════════════════════════════════════╝${NC}"
+    echo ""
+
+    shards="$(memory_list_shards "$PODS_DIR" "$pod")"
+    if [ -z "$shards" ]; then
+        echo -e "  ${RED}(sem entradas)${NC}"
+        echo ""
         return
     fi
 
-    echo -e "${BLUE}╔══════════════════════════════════════════════════════════╗${NC}"
-    echo -e "${BLUE}║${NC}  ${POD_NAMES[$pod]} — Histórico Completo"
-    echo -e "${BLUE}╚══════════════════════════════════════════════════════════╝${NC}"
-    echo ""
-    grep -n "^## Tarefa Executada\|^\*\*Task\*\*" "$memory_file" | while IFS= read -r line; do
-        if echo "$line" | grep -q "## Tarefa Executada"; then
-            timestamp=$(echo "$line" | sed 's/.*## Tarefa Executada em //')
-            echo -e "  ${YELLOW}▶ $timestamp${NC}"
-        else
-            task=$(echo "$line" | sed 's/.*\*\*Task\*\*: //')
-            echo -e "    └─ $(echo "$task" | cut -c1-80)"
-        fi
-    done
+    while IFS= read -r shard; do
+        [ -n "$shard" ] || continue
+        IFS=$'\t' read -r date author task <<< "$(shard_label "$shard")"
+        echo -e "  ${YELLOW}▶ $date${NC}  ${CYAN}@$author${NC}"
+        echo -e "    └─ $(echo "$task" | cut -c1-80)"
+    done <<< "$shards"
+
+    archive_count=$(find "$(memory_archive_dir "$PODS_DIR" "$pod")" -maxdepth 1 -type f -name '*.md' 2>/dev/null | grep -c . || true)
+    if [ "$archive_count" -gt 0 ]; then
+        echo ""
+        echo -e "  ${YELLOW}+ $archive_count entrada(s) em memory/archive/${NC}"
+    fi
     echo ""
 }
 
 show_all_summary() {
+    local total_entries=0 pod count shards last_shard
+
     echo -e "${BLUE}╔══════════════════════════════════════════════════════════╗${NC}"
     echo -e "${BLUE}║  Dev-IA-Team — Status Geral                              ║${NC}"
     echo -e "${BLUE}╚══════════════════════════════════════════════════════════╝${NC}"
     echo ""
 
-    total_tasks=0
+    for pod in "${MEMORY_VALID_PODS[@]}"; do
+        [ -f "$(memory_state_file "$PODS_DIR" "$pod")" ] || continue
 
-    for pod in "${ALL_PODS[@]}"; do
-        memory_file=$(get_memory_file "$pod")
-        [ ! -f "$memory_file" ] && continue
+        shards="$(memory_list_shards "$PODS_DIR" "$pod")"
+        count=$(printf '%s\n' "$shards" | grep -c . || true)
+        total_entries=$((total_entries + count))
 
-        task_count=$(grep -c "^## Tarefa Executada" "$memory_file" 2>/dev/null || echo "0")
-        total_tasks=$((total_tasks + task_count))
-
-        last_timestamp=$(grep "^## Tarefa Executada" "$memory_file" 2>/dev/null | tail -1 | sed 's/## Tarefa Executada em //')
-        last_task=$(grep -A1 "^## Tarefa Executada" "$memory_file" 2>/dev/null | grep "^\*\*Task\*\*" | tail -1 | sed 's/\*\*Task\*\*: //')
-
-        if [ "$task_count" -gt 0 ]; then
-            echo -e "${GREEN}●${NC} ${YELLOW}[$pod]${NC} ${POD_NAMES[$pod]}"
-            echo -e "    Tasks: ${CYAN}$task_count${NC}  |  Última: $last_timestamp"
-            if [ -n "$last_task" ]; then
-                echo -e "    └─ $(echo "$last_task" | cut -c1-75)..."
-            fi
+        if [ "$count" -gt 0 ]; then
+            last_shard="$(printf '%s\n' "$shards" | tail -1)"
+            IFS=$'\t' read -r date author task <<< "$(shard_label "$last_shard")"
+            echo -e "${GREEN}●${NC} ${YELLOW}[$pod]${NC} $(pod_display_name "$pod")"
+            echo -e "    Entradas: ${CYAN}$count${NC}  |  Última: $date  ${CYAN}@$author${NC}"
+            echo -e "    └─ $(echo "$task" | cut -c1-75)"
         else
-            echo -e "${RED}○${NC} ${YELLOW}[$pod]${NC} ${POD_NAMES[$pod]}  ${RED}(sem tarefas)${NC}"
+            echo -e "${RED}○${NC} ${YELLOW}[$pod]${NC} $(pod_display_name "$pod")  ${RED}(sem entradas)${NC}"
         fi
         echo ""
     done
 
-    echo -e "Total de tarefas executadas: ${CYAN}$total_tasks${NC}"
+    echo -e "Total de entradas de memória: ${CYAN}$total_entries${NC}"
     echo ""
 
-    # Shared artifacts
     SHARED_DIR="$AGENTS_DIR/context/shared"
     if [ -d "$SHARED_DIR" ]; then
         artifact_count=0
@@ -116,11 +131,9 @@ show_all_summary() {
     fi
 }
 
-# Entry point
-if [ -n "$1" ]; then
-    VALID_PODS=("po" "qa" "backend" "frontend" "sec" "devops" "supervisor")
-    if [[ ! " ${VALID_PODS[@]} " =~ " $1 " ]]; then
-        echo -e "${RED}Pod '$1' inválido. Disponíveis: ${VALID_PODS[*]}${NC}"
+if [ -n "${1:-}" ]; then
+    if ! memory_is_valid_pod "$1"; then
+        echo -e "${RED}Pod '$1' inválido. Disponíveis: ${MEMORY_VALID_PODS[*]}${NC}" >&2
         exit 1
     fi
     show_pod_detail "$1"

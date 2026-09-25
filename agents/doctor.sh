@@ -66,6 +66,8 @@ check_executable "$AGENTS_DIR/update_memory.sh" "update_memory.sh executavel"
 check_executable "$AGENTS_DIR/status.sh" "status.sh executavel"
 check_executable "$AGENTS_DIR/run_chain.sh" "run_chain.sh executavel"
 check_executable "$AGENTS_DIR/archive_memory.sh" "archive_memory.sh executavel"
+check_executable "$AGENTS_DIR/migrate_memory.sh" "migrate_memory.sh executavel"
+check_file "$AGENTS_DIR/lib/memory.sh" "lib/memory.sh presente"
 echo ""
 
 echo "[2/5] Pods e arquivos obrigatorios"
@@ -109,12 +111,33 @@ fi
 echo ""
 
 echo "[5/5] Integridade basica de memoria"
-for pod in po backend frontend qa sec devops; do
+for pod in po backend frontend qa sec devops supervisor; do
     mem="$PODS_DIR/$pod/memory.md"
-    if grep -q "^# " "$mem"; then
+    log_dir="$PODS_DIR/$pod/memory"
+
+    if [ -f "$mem" ] && grep -q "^# " "$mem"; then
         ok "$pod/memory.md com cabecalho markdown"
-    else
+    elif [ -f "$mem" ]; then
         warn "$pod/memory.md sem cabecalho markdown inicial"
+    else
+        warn "$pod/memory.md ausente"
+    fi
+
+    if [ -d "$log_dir" ]; then
+        shard_count=$(find "$log_dir" -maxdepth 1 -type f -name "*.md" | wc -l | tr -d " ")
+        ok "$pod/memory/ presente ($shard_count entrada(s) ativa(s))"
+    else
+        warn "$pod/memory/ ausente — rode ./migrate_memory.sh"
+    fi
+done
+echo ""
+
+# Memoria em shards: nenhum log legado pode ter sobrado dentro do estado curado
+for pod in po backend frontend qa sec devops supervisor; do
+    mem="$PODS_DIR/$pod/memory.md"
+    [ -f "$mem" ] || continue
+    if grep -q "^## Tarefa Executada\|^### Output salvo em" "$mem"; then
+        warn "$pod/memory.md ainda tem log no formato antigo — rode ./migrate_memory.sh"
     fi
 done
 echo ""
