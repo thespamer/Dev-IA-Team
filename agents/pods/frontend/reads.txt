@@ -1,0 +1,6 @@
+# Artefatos que o Frontend le de context/shared/
+
+user_stories.md       # PO: escopo e criterios de aceite
+decisions.md          # PO: decisoes de produto
+api_spec.md           # Backend: endpoints, payloads, codigos de erro
+bugs.md               # QA: defeitos atribuidos ao frontend

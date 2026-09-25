@@ -1,0 +1,7 @@
+# Artefatos que o DevOps le de context/shared/
+
+api_spec.md           # Backend: portas, health checks, versionamento
+schemas.md            # Backend: migracoes e necessidades de storage
+services.md           # Backend: o que empacotar e escalar
+test_plans.md         # QA: quais suites rodam em qual stage do pipeline
+security_reviews.md   # Sec: gates obrigatorios antes de prod

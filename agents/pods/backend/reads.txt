@@ -1,0 +1,7 @@
+# Artefatos que o Backend le de context/shared/
+
+user_stories.md       # PO: escopo e criterios de aceite
+decisions.md          # PO: decisoes de produto que restringem a API
+security_reviews.md   # Sec: findings a corrigir na API
+vulnerabilities.md    # Sec: CVEs e riscos abertos
+bugs.md               # QA: defeitos atribuidos ao backend

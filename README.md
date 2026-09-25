@@ -38,7 +38,8 @@ agents/
 ├── archive_memory.sh          # Moves old memory entries to memory/archive/
 ├── migrate_memory.sh          # One-shot: splits legacy memory.md into memory.md + memory/
 ├── lib/
-│   └── memory.sh              # Shared helpers for the sharded memory layout
+│   ├── memory.sh              # Shared helpers for the sharded memory layout
+│   └── artifacts.sh           # Reads each pod's reads.txt manifest
 ├── run_chain.sh               # Step-by-step chain runner with ENTER prompts
 ├── doctor.sh                  # Validates setup and required project files
 ├── tests/
@@ -60,6 +61,7 @@ agents/
     │   ├── memory.md          # Curated state — schemas, endpoints, decisions (hand-edited)
     │   ├── memory/            # Entry log — one file per entry, never appended to
     │   │   └── archive/       # Older entries, moved out of the prompt by archive_memory.sh
+    │   ├── reads.txt          # Which shared artifacts this pod receives
     │   └── context/           # Artifacts: user_stories.md, roadmap.md, decisions.md
     ├── backend/
     │   ├── PROMPT.md
@@ -121,6 +123,43 @@ nano context/shared/project.md
 ```
 
 The terminal prints everything. Copy it. Paste into your AI chat. Done.
+
+---
+
+## Who reads what — `reads.txt`
+
+Every pod declares which shared artifacts it receives, in `pods/<pod>/reads.txt`:
+
+```
+# Artefatos que o QA le de context/shared/
+user_stories.md       # PO: criterios de aceite = base dos casos de teste
+api_spec.md           # Backend: endpoints a exercitar
+components.md         # Frontend: componentes e estados
+```
+
+Without this, every pod got **every** file in `context/shared/` — so the prompt
+grew without bound as the squad produced artifacts, and DevOps read the full user
+stories it never uses. With realistically sized artifacts (~15 KB each, 15 of
+them), declaring reads cuts each pod's prompt by 51–78%.
+
+Rules:
+
+- One filename per line, no directories. Entries naming a path outside
+  `context/shared/` are rejected and reported on stderr — a `reads.txt` line is a
+  file that gets pasted into an AI prompt, so `../../../.ssh/id_rsa` must never
+  resolve.
+- `#` starts a comment; blank lines are ignored.
+- A lone `*` restores "read everything" — this is what `supervisor` uses, since
+  planning needs the whole picture.
+- A declared artifact that does not exist yet is skipped silently. Nothing has
+  produced it yet, which is normal.
+- No `reads.txt` at all falls back to reading everything, and `activate.sh` warns.
+
+`project.md` is not listed anywhere: it is the shared project context, always
+loaded for every pod in its own section.
+
+`./doctor.sh` validates every manifest and shows which declared artifacts the
+squad has not produced yet.
 
 ---
 

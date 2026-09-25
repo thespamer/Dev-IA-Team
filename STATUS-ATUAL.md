@@ -70,6 +70,23 @@ Ultima atualizacao: 2026-09-24
   - dois autores concorrentes geram dois arquivos distintos
   - shard carrega frontmatter de autoria
 
+## Concluido - Manifesto de Artefatos por Pod
+
+- `agents/lib/artifacts.sh` criado: selecao de artefatos inter-pod via manifesto.
+- `pods/<pod>/reads.txt` criado para os 7 pods, declarando o que cada um consome.
+  Nomes derivados do que cada `PROMPT.md` diz produzir.
+- `activate.sh` trocou o glob de `context/shared/*.md` pela leitura do manifesto.
+  Com artefatos de tamanho realista (~15 KB cada, 15 deles), a reducao de prompt
+  por pod ficou entre 51% e 78%. Supervisor usa `*` de proposito.
+- Entrada de manifesto apontando fora de `context/shared/` e rejeitada e
+  reportada em stderr. Uma linha `../../../.ssh/id_rsa` num PR despejaria o
+  arquivo no prompt enviado para a IA.
+- Pod sem `reads.txt` cai no comportamento antigo (le tudo) e `activate.sh` avisa.
+- `doctor.sh` ganhou a etapa [4/6]: valida manifestos e lista artefatos
+  declarados que a squad ainda nao produziu.
+- Smoke tests novos: selecao por manifesto, `*` do supervisor, rejeicao de
+  traversal, e ativacao limpa de todo pod sem nenhum artefato presente.
+
 ## Bugs Pre-existentes Corrigidos
 
 - `tests/lint_text_consistency.sh` falhava no `main` desde o commit 0b6c277:
@@ -97,28 +114,30 @@ Ultima atualizacao: 2026-09-24
 
 ## Pendencias Sugeridas para Proxima Sessao
 
-Prioridade alta (destravam uso por squad):
+Prioridade alta (destrava uso por squad):
 
-1. Manifesto de artefatos por pod. Hoje `activate.sh` da `cat` em todos os
-   `context/shared/*.md` para todo pod — o prompt cresce sem limite conforme a
-   squad produz artefatos. Trocar o glob por leitura de `pods/<pod>/reads.txt`.
-2. Contrato de memoria obrigatorio: `--strict-validate` por padrao e o bloco
+1. Contrato de memoria obrigatorio: `--strict-validate` por padrao e o bloco
    `## MEMORY UPDATE` exigido no `PROMPT.md` de cada pod, para a IA emitir o
-   resumo em vez de o humano redigitar.
+   resumo em vez de o humano redigitar. Precisa de fallback pensado para quando
+   a IA nao emitir o bloco — `exit 1` puro vai irritar a squad.
 
 Prioridade media:
 
-3. `CODEOWNERS` por pod (precisa dos handles reais do time).
-4. `context/shared/project.md` esta commitado com dados de exemplo (TaskFlow).
+2. `CODEOWNERS` por pod (precisa dos handles reais do time no GitHub).
+3. `context/shared/project.md` esta commitado com dados de exemplo (TaskFlow).
    Virar `project.example.md` e fazer o `doctor.sh` pedir o real no primeiro uso.
-5. Resolver a duplicata do prompt do supervisor e as code fences escapadas.
+4. Resolver a duplicata do prompt do supervisor e as code fences escapadas.
+5. Revisar os `reads.txt` default: os nomes saem do que cada `PROMPT.md` declara
+   produzir, mas quem consome o que e decisao de arquitetura do time.
 
 Prioridade baixa:
 
 6. Padronizar acentuacao/ASCII nos templates de memoria.
 7. Expandir lint textual para cobertura semantica mais ampla.
+8. Pods escrevem em `context/` (privado) mas `activate.sh` so le
+   `context/shared/`. Hoje o `context/` privado de cada pod nao entra em prompt
+   nenhum — decidir se e intencional ou se falta promover.
 
 ## Ponto de Retomada
 
-Retomar pelo item 1 (manifesto de artefatos), que e o proximo limite de escala
-do prompt depois da memoria em shards.
+Retomar pelo item 1 (contrato de memoria obrigatorio).

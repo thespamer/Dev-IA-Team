@@ -1,0 +1,8 @@
+# Artefatos que o Product Owner le de context/shared/
+#
+# O PO prioriza com base no que voltou de qualidade e seguranca.
+# project.md e sempre carregado e nao entra aqui.
+
+bugs.md               # QA: o que esta quebrado hoje
+test_results.md       # QA: cobertura e gates
+vulnerabilities.md    # Sec: risco que pode virar item de backlog

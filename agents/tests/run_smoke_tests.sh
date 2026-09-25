@@ -6,12 +6,21 @@ ROOT_DIR="$(cd "$(dirname "$0")/../.." && pwd)"
 AGENTS_DIR="$ROOT_DIR/agents"
 PO_LOG_DIR="$AGENTS_DIR/pods/po/memory"
 CREATED_SHARDS=()
+SMOKE_ARTIFACTS=()
+MANIFEST_BAK=""
 
 cleanup() {
-    local shard
+    local shard artifact
     for shard in "${CREATED_SHARDS[@]:-}"; do
         [ -n "$shard" ] && rm -f "$shard"
     done
+    for artifact in "${SMOKE_ARTIFACTS[@]:-}"; do
+        [ -n "$artifact" ] && rm -f "$artifact"
+    done
+    if [ -n "$MANIFEST_BAK" ] && [ -f "$MANIFEST_BAK" ]; then
+        cp "$MANIFEST_BAK" "$AGENTS_DIR/pods/devops/reads.txt"
+        rm -f "$MANIFEST_BAK"
+    fi
     rm -rf "$AGENTS_DIR/.locks/po-memory.lock" 2>/dev/null || true
 }
 
@@ -32,6 +41,7 @@ list_po_shards() {
 
 echo "[smoke] Bash syntax check"
 bash -n "$AGENTS_DIR/lib/memory.sh"
+bash -n "$AGENTS_DIR/lib/artifacts.sh"
 bash -n "$AGENTS_DIR/activate.sh"
 bash -n "$AGENTS_DIR/update_memory.sh"
 bash -n "$AGENTS_DIR/status.sh"
@@ -91,6 +101,73 @@ if ! printf '%s' "$raw_out" | grep -q '=== TASK TO EXECUTE ==='; then
     echo "--raw stdout missing the task section"
     exit 1
 fi
+
+echo "[smoke] every pod activates cleanly with no shared artifacts present"
+# Regressao: artifacts_for_pod retornava 1 quando nada casava no manifesto, e o
+# 'set -e' do activate.sh matava a montagem do prompt no meio, em silencio.
+for pod in po backend frontend qa sec devops supervisor; do
+    if ! "$AGENTS_DIR/activate.sh" --raw "$pod" "smoke empty artifacts" >/dev/null 2>&1; then
+        echo "activate.sh failed for pod '$pod' with no artifacts in context/shared/"
+        exit 1
+    fi
+done
+
+echo "[smoke] reads.txt selects only the declared artifacts"
+ART_DIR="$AGENTS_DIR/context/shared"
+for name in api_spec schemas user_stories bugs; do
+    printf '# %s\nsmoke artifact %s\n' "$name" "$name" > "$ART_DIR/$name.md"
+    SMOKE_ARTIFACTS+=("$ART_DIR/$name.md")
+done
+
+# qa declara api_spec + schemas + user_stories (nao bugs); devops declara api_spec
+# + schemas (nao user_stories nem bugs).
+qa_out="$("$AGENTS_DIR/activate.sh" --raw qa "smoke manifest" 2>/dev/null)"
+if ! printf '%s' "$qa_out" | grep -q 'smoke artifact api_spec'; then
+    echo "qa did not receive api_spec.md, which its reads.txt declares"
+    exit 1
+fi
+if printf '%s' "$qa_out" | grep -q 'smoke artifact bugs'; then
+    echo "qa received bugs.md, which its reads.txt does not declare"
+    exit 1
+fi
+
+devops_out="$("$AGENTS_DIR/activate.sh" --raw devops "smoke manifest" 2>/dev/null)"
+if printf '%s' "$devops_out" | grep -q 'smoke artifact user_stories'; then
+    echo "devops received user_stories.md, which its reads.txt does not declare"
+    exit 1
+fi
+
+echo "[smoke] supervisor reads every artifact (manifest is '*')"
+sup_out="$("$AGENTS_DIR/activate.sh" --raw supervisor "smoke manifest" 2>/dev/null)"
+for name in api_spec schemas user_stories bugs; do
+    if ! printf '%s' "$sup_out" | grep -q "smoke artifact $name"; then
+        echo "supervisor missed $name.md despite the '*' manifest"
+        exit 1
+    fi
+done
+
+echo "[smoke] reads.txt rejects paths outside context/shared/"
+manifest_bak="$(mktemp)"
+cp "$AGENTS_DIR/pods/devops/reads.txt" "$manifest_bak"
+MANIFEST_BAK="$manifest_bak"
+printf '../../../../etc/passwd\nsubdir/x.md\napi_spec.md\n' > "$AGENTS_DIR/pods/devops/reads.txt"
+traversal_out="$("$AGENTS_DIR/activate.sh" --raw devops "smoke traversal" 2>/dev/null)"
+traversal_err="$("$AGENTS_DIR/activate.sh" --raw devops "smoke traversal" 2>&1 >/dev/null)"
+if printf '%s' "$traversal_out" | grep -q 'root:'; then
+    echo "activate.sh leaked /etc/passwd into the prompt"
+    exit 1
+fi
+if ! printf '%s' "$traversal_err" | grep -q 'entrada invalida'; then
+    echo "invalid manifest entries were not reported on stderr"
+    exit 1
+fi
+if ! printf '%s' "$traversal_out" | grep -q 'smoke artifact api_spec'; then
+    echo "valid entry was dropped alongside the invalid ones"
+    exit 1
+fi
+cp "$manifest_bak" "$AGENTS_DIR/pods/devops/reads.txt"
+rm -f "$manifest_bak"
+MANIFEST_BAK=""
 
 echo "[smoke] update_memory strict validation (must fail invalid summary)"
 before_shards="$(list_po_shards)"

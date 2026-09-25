@@ -26,6 +26,8 @@ RUNLOG_DIR="$AGENTS_DIR/.runlog"
 
 # shellcheck source=lib/memory.sh
 . "$AGENTS_DIR/lib/memory.sh"
+# shellcheck source=lib/artifacts.sh
+. "$AGENTS_DIR/lib/artifacts.sh"
 
 RED='\033[0;31m'
 GREEN='\033[0;32m'
@@ -182,21 +184,28 @@ if [ -f "$SHARED_CONTEXT_DIR/project.md" ] && [ -s "$SHARED_CONTEXT_DIR/project.
 fi
 
 # ── INTER-POD ARTIFACTS ────────────────────────────────────────
-ARTIFACTS_SHOWN=false
-for artifact_file in "$SHARED_CONTEXT_DIR"/*.md; do
-    [ "$artifact_file" = "$SHARED_CONTEXT_DIR/project.md" ] && continue
-    if [ -f "$artifact_file" ] && [ -s "$artifact_file" ]; then
-        if [ "$ARTIFACTS_SHOWN" = false ]; then
-            sep
-            section "INTER-POD ARTIFACTS (outputs de outros pods)" "$CYAN"
-            ARTIFACTS_SHOWN=true
-        fi
-        artifact_name=$(basename "$artifact_file" .md)
-        emit "--- $artifact_name ---"
+# O que entra aqui vem de pods/<pod>/reads.txt. Sem manifesto o pod recebe todo
+# context/shared/*.md, que e o comportamento antigo e faz o prompt crescer sem
+# teto conforme a squad produz artefatos.
+MANIFEST="$(artifacts_manifest_path "$PODS_DIR" "$POD_NAME")"
+if [ ! -f "$MANIFEST" ]; then
+    say "${YELLOW}[WARN]${NC} $POD_NAME sem reads.txt — recebendo todo context/shared/"
+fi
+
+ARTIFACTS="$(artifacts_for_pod "$PODS_DIR" "$SHARED_CONTEXT_DIR" "$POD_NAME")"
+if [ -n "$ARTIFACTS" ]; then
+    sep
+    section "INTER-POD ARTIFACTS (outputs de outros pods)" "$CYAN"
+    ARTIFACT_COUNT=0
+    while IFS= read -r artifact_file; do
+        [ -n "$artifact_file" ] || continue
+        emit "--- $(basename "$artifact_file" .md) ---"
         cat "$artifact_file"
         emit ""
-    fi
-done
+        ARTIFACT_COUNT=$((ARTIFACT_COUNT + 1))
+    done <<< "$ARTIFACTS"
+    say "${YELLOW}[INFO]${NC} Artefatos: $ARTIFACT_COUNT"
+fi
 
 # ── MEMORY: ESTADO CURADO ─────────────────────────────────────
 sep
